@@ -10,6 +10,8 @@ def render_prompt(conn, prompt_string):
     host = url.host
     if not url.port and conn.dialect.name in ("postgresql", "redshift"):
         port = 5432
+    elif not url.port and conn.dialect.name == "snowflake":
+        port = 443
     else:
         port = url.port
 
