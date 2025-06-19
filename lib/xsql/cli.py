@@ -37,16 +37,23 @@ def prompt_continuation(width, line_number, is_soft_wrap):
     return "> "
 
 
+def try_close(conn):
+    try:
+        conn.close()
+    except Exception:
+        pass
+
+
 def run(args):
 
     conn = connect(args)
 
     if args.command:
         run_command(conn, args.command, output=args.output, autocommit=True)
-        clean_exit()
+        clean_exit(conn)
     elif args.file:
         run_file(conn, args.file, output=args.output, autocommit=True)
-        clean_exit()
+        clean_exit(conn)
 
     prompt_args = {
         "vi_mode": True,
@@ -102,10 +109,11 @@ def run(args):
                         conn.rollback()
 
         except EOFError:
-            clean_exit()
+            clean_exit(conn)
         except KeyboardInterrupt:
             pass
 
 
-def clean_exit():
+def clean_exit(conn=None):
+    try_close(conn)
     sys.exit(0)
