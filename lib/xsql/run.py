@@ -4,6 +4,7 @@ import sys
 from sqlalchemy import text
 
 from .config import config
+from .exc import QuitException
 from .output import write
 
 
@@ -11,6 +12,9 @@ def get_metacommand(command):
 
     if not command:
         return False
+
+    if command == "help":
+        command = "\??"
 
     if is_maybe_metacommand(command):
         match = re.search(r"^\s*\\([a-z?+]+)(?:\s+(.+))?$", command)
@@ -20,6 +24,9 @@ def get_metacommand(command):
 
 
 def is_maybe_metacommand(command):
+    if command.strip() == "help":
+        return True
+
     return command.strip().startswith("\\")
 
 
@@ -111,6 +118,10 @@ def run_metacommand(conn, metacommand, rest, output=None, autocommit=None):
         )
     elif metacommand == "?":
         metacommand_help(output=output)
+    elif metacommand == "??":
+        metacommand_help_main(output=output)
+    elif metacommand == "q":
+        raise QuitException()
     else:
         handle_invalid_command(metacommand, output)
 
@@ -127,6 +138,13 @@ def handle_invalid_command(command, output=None):
 def metacommand_help(output=None):
     output.write("Input/Output\n")
     output.write("  \\i FILE                execute commands from file\n")
+
+
+@resolve_options
+def metacommand_help_main(output=None):
+	output.write("You are using xsql, the command-line interface to any database.\n")
+	output.write("Type:  \? for help with xsql commands\n")
+	output.write("       \q to quit\n")
 
 
 @resolve_options
