@@ -3,7 +3,7 @@ import sys
 
 from sqlalchemy import text
 
-from .config import config, set_timing
+from .config import config, set_extended_display, set_timing
 from .exc import QuitException
 from .output import write
 
@@ -141,6 +141,25 @@ def run_metacommand(conn, metacommand, rest, output=None, autocommit=None):
                 return
 
         set_timing(value)
+    elif metacommand == "x":
+        if not rest:
+            value = not config.extended_display
+        else:
+            if rest in ("on", "true"):
+                value = True
+            elif rest in ("off", "false"):
+                value = False
+            else:
+                handle_invalid_command_value(
+                    metacommand,
+                    rest,
+                    expected="Boolean expected",
+                    output=output,
+                )
+                set_extended_display(config.extended_display)
+                return
+
+        set_extended_display(value)
     else:
         handle_invalid_command(metacommand, output)
 

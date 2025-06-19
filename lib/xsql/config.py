@@ -21,6 +21,7 @@ class Configuration:
         prompt2="%/-# ",
         encoding=None,
         quiet=False,
+        extended_display=False,
         sets=None,
     ):
 
@@ -39,6 +40,7 @@ class Configuration:
         self.prompt2 = prompt2
         self.encoding = encoding
         self.quiet = quiet
+        self.extended_display = extended_display
 
         if sets is None:
             sets = []
@@ -100,8 +102,12 @@ def process_command_with_variable(command, line, default=None):
     return variable, trim_quotes(value)
 
 
+def get_remainder(command, line):
+    return line[len(command):].strip()
+
+
 def process_command_with_value(command, line, default=None):
-    remainder = line[len(command):].strip()
+    remainder = get_remainder(command, line)
 
     if not remainder:
         return default
@@ -138,6 +144,17 @@ def set_timing(value):
         sys.stdout.write("Timing is {}.\n".format(display_value))
 
 
+def set_extended_display(value):
+    config.extended_display = value
+    if value:
+        display_value = "on"
+    else:
+        display_value = "off"
+
+    if not config.quiet:
+        sys.stdout.write("Extended display is {}.\n".format(display_value))
+
+
 def set_highlight(value):
     config.highlight = value
     if value:
@@ -150,6 +167,8 @@ def set_highlight(value):
 
 
 def process_config_line(conn, filename, line_number, line):
+    from .run import run_metacommand
+
     if line.startswith("\\pset"):
         variable, value = process_command_with_variable("\\pset", line)
 
@@ -165,8 +184,17 @@ def process_config_line(conn, filename, line_number, line):
                 )
             )
     elif line == "\\timing":
-        value = process_command_with_boolean("\\timing", line, default=not config.timing)
-        set_timing(value)
+        run_metacommand(
+            None,
+            "timing",
+            get_remainder("\\timing", line),
+        )
+    elif line == "\\x":
+        run_metacommand(
+            None,
+            "x",
+            get_remainder("\\x", line),
+        )
     elif line == "\\highlight":
         value = process_command_with_boolean("\\highlight", line, default=not config.highlight)
         set_highlight(value)

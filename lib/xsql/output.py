@@ -22,24 +22,38 @@ def write(records, title=None, show_rowcount=False):
         output = sys.stdout
 
     start_time = time.monotonic()
+    total_time = 0
     write_title = True
     write_header = True
     total_rows = 0
     for batch in itertools.batched(records, 10000):
-        total_rows += _write(
-            output,
-            batch,
-            records,
-            title=title,
-            write_title=write_title,
-            write_header=write_header,
-        )
-        write_title = False
-        write_header = False
 
-    total_time = time.monotonic() - start_time
+        total_time += time.monotonic() - start_time
+        start_time = time.monotonic()
 
-    if show_rowcount:
+        if config.extended_display:
+            total_rows += write_extended(
+                output,
+                batch,
+                records,
+                total_rows,
+                title=title,
+                write_title=write_title,
+            )
+            write_title = False
+        else:
+            total_rows += write_rows(
+                output,
+                batch,
+                records,
+                title=title,
+                write_title=write_title,
+                write_header=write_header,
+            )
+            write_title = False
+            write_header = False
+
+    if not config.extended_display and show_rowcount:
         output.write("({} row".format(total_rows))
         if total_rows != 1:
             output.write("s")
@@ -68,7 +82,7 @@ def as_str(v):
     return str(v)
 
 
-def _write(output, records, result, title=None, write_title=True, write_header=True):
+def write_rows(output, records, result, title=None, write_title=True, write_header=True):
 
     max_field_sizes = {}
     number_looking_fields = {}
@@ -137,5 +151,69 @@ def _write(output, records, result, title=None, write_title=True, write_header=T
         values = [as_str(record[f]) for f in fieldnames]
         output.write(record_fmt_str.format(*values))
         output.write("\n")
+
+    return row_count
+
+
+def write_extended(output, records, result, total_rows, title=None, write_title=True):
+
+    row_count = 0
+
+    rotated = []
+
+    max_column_size = None
+    max_value_size = None
+
+    for raw in records:
+
+        row_count += 1
+
+        row_number = row_count + total_rows
+
+        rotated.append(
+            {
+                "row_number": row_number,
+            },
+        )
+
+        max_column_size = len("[ RECORD {} ]".format(row_number))
+        max_value_size = 0
+
+        record = raw._asdict()
+
+        for key, value in record.items():
+
+            str_value = as_str(value)
+
+            if len(key) > max_column_size:
+                max_column_size = len(key)
+            if len(str_value) > max_value_size:
+                max_value_size = len(str_value)
+
+            rotated.append(
+                {
+                    "column": key,
+                    "value": str_value,
+                },
+            )
+
+    for record in rotated:
+
+        if record.get("row_number"):
+
+            record_str = "-[ RECORD {} ]".format(record["row_number"])
+            record_str = record_str + ("-" * ((max_column_size - len(record_str)) + 1))
+
+            output.write(record_str)
+            output.write("+")
+            output.write("-" * (max_value_size + 2))
+            output.write("\n")
+
+        else:
+
+            record_fmt_str = "{:<" + str(max_column_size + 1) + "}| {:<" + str(max_value_size + 1) + "}"
+
+            output.write(record_fmt_str.format(record["column"], record["value"]))
+            output.write("\n")
 
     return row_count
