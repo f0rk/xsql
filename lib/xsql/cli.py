@@ -1,3 +1,4 @@
+import logging
 import os.path
 import re
 import sys
@@ -18,6 +19,10 @@ from .history import FileHistory
 from .prompt import render_prompt
 from .run import is_maybe_metacommand, run_command, run_file
 from .version import __version__
+
+
+sqlglot_logger = logging.getLogger("sqlglot")
+sqlglot_logger.setLevel(logging.ERROR)
 
 
 bindings = KeyBindings()
@@ -138,6 +143,8 @@ def run(args):
 
                     if config.autocommit:
                         conn.rollback()
+
+                        config.run_sets(conn)
 
         except EOFError:
             clean_exit(conn)
