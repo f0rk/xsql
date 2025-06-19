@@ -10,7 +10,7 @@ from decimal import Decimal
 from .config import config
 
 
-def write(records):
+def write(records, title=None):
 
     pager = None
 
@@ -22,14 +22,18 @@ def write(records):
         output = sys.stdout
 
     start_time = time.monotonic()
+    write_title = True
     write_header = True
     for batch in itertools.batched(records, 10000):
         _write(
             output,
             batch,
             records,
+            title=title,
+            write_title=write_title,
             write_header=write_header,
         )
+        write_title = False
         write_header = False
 
     total_time = time.monotonic() - start_time
@@ -56,7 +60,7 @@ def as_str(v):
     return str(v)
 
 
-def _write(output, records, result, write_header=True):
+def _write(output, records, result, title=None, write_title=True, write_header=True):
 
     max_field_sizes = {}
     number_looking_fields = {}
@@ -101,6 +105,12 @@ def _write(output, records, result, write_header=True):
 
     header_fmt_str = "|".join(header_fmt_parts)
     record_fmt_str = "|".join(record_fmt_parts)
+
+    if write_title and title is not None:
+        title_width = len("+".join(sep_parts))
+        title_fmt_str = "{:^" + str(title_width) + "}"
+        output.write(title_fmt_str.format(title))
+        output.write("\n")
 
     if write_header:
         output.write(header_fmt_str.format(*fieldnames))
