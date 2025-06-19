@@ -1,0 +1,6 @@
+[flake8]
+ignore =
+        # E501: line too long - doesn't work with some of our data and nested dicts
+        E501,
+
+inline-quotes = double

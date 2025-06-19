@@ -3,7 +3,7 @@ import sys
 
 from sqlalchemy import text
 
-from .config import config
+from .config import config, set_timing
 from .exc import QuitException
 from .output import write
 
@@ -14,7 +14,7 @@ def get_metacommand(command):
         return False
 
     if command == "help":
-        command = "\??"
+        command = "\\??"
 
     if is_maybe_metacommand(command):
         match = re.search(r"^\s*\\([a-z?+]+)(?:\s+(.+))?$", command)
@@ -80,7 +80,7 @@ def run_command(conn, command, output=None, autocommit=None, title=None):
 
         results = conn.execute(command.execution_options(autocommit=autocommit))
         try:
-            write(results, title=title)
+            write(results, title=title, show_rowcount=True)
         except BrokenPipeError:
             pass
 
@@ -122,6 +122,25 @@ def run_metacommand(conn, metacommand, rest, output=None, autocommit=None):
         metacommand_help_main(output=output)
     elif metacommand == "q":
         raise QuitException()
+    elif metacommand == "timing":
+        if not rest:
+            value = not config.timing
+        else:
+            if rest in ("on", "true"):
+                value = True
+            elif rest in ("off", "false"):
+                value = False
+            else:
+                handle_invalid_command_value(
+                    metacommand,
+                    rest,
+                    expected="Boolean expected",
+                    output=output,
+                )
+                set_timing(config.timing)
+                return
+
+        set_timing(value)
     else:
         handle_invalid_command(metacommand, output)
 
@@ -135,6 +154,15 @@ def handle_invalid_command(command, output=None):
 
 
 @resolve_options
+def handle_invalid_command_value(command, value, expected=None, output=None):
+    output.write('unrecognized value "{}" for "\\{}"'.format(value, command))
+    if expected:
+        output.write(": ")
+        output.write(expected)
+    output.write("\n")
+
+
+@resolve_options
 def metacommand_help(output=None):
     output.write("Input/Output\n")
     output.write("  \\i FILE                execute commands from file\n")
@@ -143,8 +171,8 @@ def metacommand_help(output=None):
 @resolve_options
 def metacommand_help_main(output=None):
 	output.write("You are using xsql, the command-line interface to any database.\n")
-	output.write("Type:  \? for help with xsql commands\n")
-	output.write("       \q to quit\n")
+	output.write("Type:  \\? for help with xsql commands\n")
+	output.write("       \\q to quit\n")
 
 
 @resolve_options

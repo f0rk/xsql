@@ -10,7 +10,7 @@ from decimal import Decimal
 from .config import config
 
 
-def write(records, title=None):
+def write(records, title=None, show_rowcount=False):
 
     pager = None
 
@@ -24,8 +24,9 @@ def write(records, title=None):
     start_time = time.monotonic()
     write_title = True
     write_header = True
+    total_rows = 0
     for batch in itertools.batched(records, 10000):
-        _write(
+        total_rows += _write(
             output,
             batch,
             records,
@@ -38,11 +39,18 @@ def write(records, title=None):
 
     total_time = time.monotonic() - start_time
 
-    if config.timing:
-        output.write("Time: {:.3f} ms\n".format(total_time * 1000))
+    if show_rowcount:
+        output.write("({} row".format(total_rows))
+        if total_rows != 1:
+            output.write("s")
+        output.write(")\n")
+    output.write("\n")
 
     if pager is not None:
         pager.communicate()
+
+    if config.timing:
+        sys.stdout.write("Time: {:.3f} ms\n".format(total_time * 1000))
 
 
 def as_str(v):
@@ -65,7 +73,11 @@ def _write(output, records, result, title=None, write_title=True, write_header=T
     max_field_sizes = {}
     number_looking_fields = {}
 
+    row_count = 0
+
     for raw in records:
+
+        row_count += 1
 
         record = raw._asdict()
 
@@ -125,3 +137,5 @@ def _write(output, records, result, title=None, write_title=True, write_header=T
         values = [as_str(record[f]) for f in fieldnames]
         output.write(record_fmt_str.format(*values))
         output.write("\n")
+
+    return row_count

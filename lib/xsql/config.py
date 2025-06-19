@@ -75,6 +75,10 @@ class Configuration:
                         if line.strip():
                             process_config_line(conn, filename, line_number, line)
 
+    def run_sets(self, conn):
+        for set_ in self.sets:
+            conn.execute(text(set_).execution_options(autocommit=True))
+
 
 def trim_quotes(value):
     if isinstance(value, str):
@@ -161,10 +165,10 @@ def process_config_line(conn, filename, line_number, line):
                 )
             )
     elif line == "\\timing":
-        value = process_command_with_boolean("\\timing", line, default=True)
+        value = process_command_with_boolean("\\timing", line, default=not config.timing)
         set_timing(value)
     elif line == "\\highlight":
-        value = process_command_with_boolean("\\highlight", line, default=True)
+        value = process_command_with_boolean("\\highlight", line, default=not config.highlight)
         set_highlight(value)
     elif line.startswith("\\set"):
         variable, value = process_command_with_variable("\\set", line)
