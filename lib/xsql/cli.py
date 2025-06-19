@@ -1,5 +1,6 @@
 import re
 import sys
+import time
 
 import sqlalchemy
 import sqlglot
@@ -11,6 +12,7 @@ from pygments.lexers import sql
 
 from .config import config
 from .db import connect
+from .prompt import render_prompt
 from .run import is_maybe_metacommand, run_command, run_file
 
 
@@ -22,6 +24,7 @@ def _(event):
 
     if is_maybe_metacommand(event.current_buffer.text):
         event.current_buffer.validate_and_handle()
+        return
 
     if not re.search(r";\s*$", event.current_buffer.text):
         event.current_buffer.insert_text("\n")
@@ -30,14 +33,13 @@ def _(event):
     try:
         sqlglot.transpile(event.current_buffer.text)
     except sqlglot.errors.ParseError:
-        event.current_buffer.insert_text("\n")
-        return event
+        if re.search(r";\s*$", event.current_buffer.text):
+            event.current_buffer.validate_and_handle()
+        else:
+            event.current_buffer.insert_text("\n")
+        return
 
     event.current_buffer.validate_and_handle()
-
-
-def prompt_continuation(width, line_number, is_soft_wrap):
-    return "> "
 
 
 def try_close(conn):
@@ -50,6 +52,8 @@ def try_close(conn):
 def run(args):
 
     conn = connect(args)
+
+    config.load(conn)
 
     if args.command:
         run_command(conn, args.command, output=args.output, autocommit=True)
@@ -78,16 +82,21 @@ def run(args):
 
     while True:
         try:
+            def prompt_continuation(width, line_number, is_soft_wrap):
+                return render_prompt(conn, config.prompt2)
+
             text = session.prompt(
-                "[db]> ",
+                render_prompt(conn, config.prompt1),
                 multiline=True,
                 prompt_continuation=prompt_continuation,
             )
 
             if text.strip():
+                start_time = time.monotonic()
                 try:
                     run_command(conn, text, autocommit=config.autocommit)
                 except sqlalchemy.exc.SQLAlchemyError as exc:
+                    total_time = time.monotonic() - start_time
                     is_postgres = False
                     if hasattr(exc, "orig") and hasattr(exc.orig, "pgerror"):
                         is_postgres = True
@@ -98,7 +107,7 @@ def run(args):
                             sys.stdout.write("\n")
                     else:
                         sys.stdout.write(
-                            "ERROR:  {}: {}\n"
+                            "ERROR:  {}: {}"
                             .format(
                                 exc.orig.pgcode,
                                 exc.orig.args[0],
@@ -109,6 +118,9 @@ def run(args):
                             sys.stdout.write(notice)
 
                         conn.connection.notices.clear()
+
+                    if config.timing:
+                        sys.stdout.write("Time: {:.3} ms\n".format(total_time * 1000))
 
                     if config.autocommit:
                         conn.rollback()
