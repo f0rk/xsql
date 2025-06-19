@@ -11,7 +11,7 @@ from pygments.lexers import sql
 
 from .config import config
 from .db import connect
-from .run import run_command, run_file
+from .run import is_maybe_metacommand, run_command, run_file
 
 
 bindings = KeyBindings()
@@ -19,6 +19,9 @@ bindings = KeyBindings()
 
 @bindings.add(Keys.Enter)
 def _(event):
+
+    if is_maybe_metacommand(event.current_buffer.text):
+        event.current_buffer.validate_and_handle()
 
     if not re.search(r";\s*$", event.current_buffer.text):
         event.current_buffer.insert_text("\n")
