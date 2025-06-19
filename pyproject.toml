@@ -7,17 +7,17 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "prompt-toolkit>=3.0.51",
-    "pygments>=2.19.1",
-    "sqlalchemy>=2.0.41",
+    "pygments>=2.15.1",
+    "sqlalchemy>=0.9.2",
     "sqlglot[rs]>=26.29.0",
 ]
 
 [project.optional-dependencies]
 postgres = [
-    "psycopg2>=2.9.10",
+    "psycopg2>=2.9.9",
 ]
 snowflake = [
-    "snowflake-sqlalchemy>=1.7.4",
+    "snowflake-sqlalchemy>=1.5.3",
 ]
 
 [build-system]
