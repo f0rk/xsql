@@ -10,6 +10,7 @@ parser.add_argument("url", help="the url connection string")
 parser.add_argument("--command", "-c", help="a raw sql command to run")
 parser.add_argument("--file", "-f", help="a file to run")
 parser.add_argument("--output", "-o", help="where to write output to")
+parser.add_argument("--quiet", "-q", action="store_true", help="run quietly")
 
 args = parser.parse_args()
 
