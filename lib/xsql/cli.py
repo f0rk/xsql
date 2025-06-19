@@ -1,5 +1,4 @@
 import logging
-import os.path
 import re
 import sys
 import time
@@ -15,7 +14,7 @@ from pygments.lexers import sql
 from .config import config
 from .db import connect
 from .exc import QuitException
-from .history import FileHistory
+from .history import history
 from .prompt import render_prompt
 from .run import is_maybe_metacommand, run_command, run_file
 from .version import __version__
@@ -95,7 +94,7 @@ def run(args):
         prompt_args["lexer"] = PygmentsLexer(lexer_class)
 
     if config.history_size:
-        prompt_args["history"] = FileHistory(os.path.expanduser("~/.xsql_history"))
+        prompt_args["history"] = history
 
     session = PromptSession(**prompt_args)
 

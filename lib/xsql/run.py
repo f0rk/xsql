@@ -1,10 +1,14 @@
+import os
 import re
 import sys
+import tempfile
 
+from prompt_toolkit.buffer import Buffer
 from sqlalchemy import text
 
 from .config import config, set_extended_display, set_timing
 from .exc import QuitException
+from .history import history
 from .output import write
 
 
@@ -102,6 +106,14 @@ def run_file(conn, file, output=None, autocommit=None):
 def run_metacommand(conn, metacommand, rest, output=None, autocommit=None):
     if metacommand == "i":
         run_file(conn, strip(rest), output=output, autocommit=autocommit)
+    elif metacommand == "e":
+        query = run_editor(rest)
+        run_command(
+            conn,
+            query,
+            output=output,
+            autocommit=autocommit,
+        )
     elif metacommand == "d":
         metacommand_describe(
             conn,
@@ -189,9 +201,9 @@ def metacommand_help(output=None):
 
 @resolve_options
 def metacommand_help_main(output=None):
-	output.write("You are using xsql, the command-line interface to any database.\n")
-	output.write("Type:  \\? for help with xsql commands\n")
-	output.write("       \\q to quit\n")
+    output.write("You are using xsql, the command-line interface to any database.\n")
+    output.write("Type:  \\? for help with xsql commands\n")
+    output.write("       \\q to quit\n")
 
 
 @resolve_options
@@ -269,3 +281,50 @@ def metacommand_describe_tables(conn, target, output=None, autocommit=None):
         autocommit=autocommit,
         title="List of relations",
     )
+
+
+def run_editor(text):
+    filename = None
+    add_to_history = False
+
+    if not text:
+        add_to_history = True
+        for entry in history.load_history_strings():
+            if entry.strip().startswith("\e"):
+                continue
+
+            text = entry
+            break
+    else:
+        filename = text
+
+    if filename is None:
+        descriptor, filename = tempfile.mkstemp(".sql")
+
+        os.write(descriptor, text.encode("utf-8"))
+        os.close(descriptor)
+
+        def cleanup():
+            os.unlink(filename)
+    else:
+        cleanup = None
+
+    try:
+        success = Buffer._open_file_in_editor(None, filename)
+
+        if success:
+            with open(filename, "rb") as f:
+                text = f.read().decode("utf-8")
+
+                if text.endswith("\n"):
+                    text = text[:-1]
+
+                if add_to_history:
+                    history.append_string(text)
+
+                return text
+    finally:
+        if cleanup is not None:
+            cleanup()
+
+    return ""
