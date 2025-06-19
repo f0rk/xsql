@@ -6,12 +6,19 @@ from xsql import run
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("url", help="the url connection string")
+parser.add_argument("url", help="the url connection string", nargs="?")
 parser.add_argument("--command", "-c", help="a raw sql command to run")
 parser.add_argument("--file", "-f", help="a file to run")
 parser.add_argument("--output", "-o", help="where to write output to")
 parser.add_argument("--quiet", "-q", action="store_true", help="run quietly")
+parser.add_argument("--no-xsqlrc", "-X", action="store_true", help="do not load xsqlrc")
+parser.add_argument("--tuples-only", "-t", action="store_true", help="tuples only")
+parser.add_argument("--csv", action="store_true", help="csv output mode")
+parser.add_argument("--version", action="store_true", help="print version and exit")
 
 args = parser.parse_args()
 
-run(args)
+if not args.url and not args.version:
+    parser.print_help()
+else:
+    run(args)

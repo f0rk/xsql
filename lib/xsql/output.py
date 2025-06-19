@@ -24,7 +24,7 @@ def write(records, title=None, show_rowcount=False):
     start_time = time.monotonic()
     total_time = 0
     write_title = True
-    write_header = True
+    write_header = not config.tuples_only
     total_rows = 0
     for batch in itertools.batched(records, 10000):
 
@@ -53,7 +53,15 @@ def write(records, title=None, show_rowcount=False):
             write_title = False
             write_header = False
 
-    if not config.extended_display and show_rowcount:
+    do_write_row_count = (
+        show_rowcount
+        and (
+            not config.extended_display
+            and not config.tuples_only
+        )
+    )
+
+    if do_write_row_count:
         output.write("({} row".format(total_rows))
         if total_rows != 1:
             output.write("s")

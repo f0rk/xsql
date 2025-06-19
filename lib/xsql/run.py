@@ -6,7 +6,7 @@ import tempfile
 from prompt_toolkit.buffer import Buffer
 from sqlalchemy import text
 
-from .config import config, set_extended_display, set_timing
+from .config import config, set_extended_display, set_timing, set_tuples_only
 from .exc import QuitException
 from .history import history
 from .output import write
@@ -134,9 +134,22 @@ def run_metacommand(conn, metacommand, rest, output=None, autocommit=None):
         metacommand_help_main(output=output)
     elif metacommand == "q":
         raise QuitException()
-    elif metacommand == "timing":
+    elif metacommand in ("timing", "x", "t"):
+
+        config_attr = {
+            "timing": "timing",
+            "x": "extended_display",
+            "t": "tuples_only",
+        }[metacommand]
+
+        set_function = {
+            "timing": set_timing,
+            "x": set_extended_display,
+            "t": set_tuples_only,
+        }[metacommand]
+
         if not rest:
-            value = not config.timing
+            value = not getattr(config, config_attr)
         else:
             if rest in ("on", "true"):
                 value = True
@@ -149,29 +162,10 @@ def run_metacommand(conn, metacommand, rest, output=None, autocommit=None):
                     expected="Boolean expected",
                     output=output,
                 )
-                set_timing(config.timing)
+                set_function(getattr(config, config_attr))
                 return
 
-        set_timing(value)
-    elif metacommand == "x":
-        if not rest:
-            value = not config.extended_display
-        else:
-            if rest in ("on", "true"):
-                value = True
-            elif rest in ("off", "false"):
-                value = False
-            else:
-                handle_invalid_command_value(
-                    metacommand,
-                    rest,
-                    expected="Boolean expected",
-                    output=output,
-                )
-                set_extended_display(config.extended_display)
-                return
-
-        set_extended_display(value)
+        set_function(value)
     else:
         handle_invalid_command(metacommand, output)
 
