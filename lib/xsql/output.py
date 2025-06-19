@@ -3,6 +3,7 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 from datetime import datetime
 from decimal import Decimal
 
@@ -20,10 +21,21 @@ def write(records):
     else:
         output = sys.stdout
 
+    start_time = time.monotonic()
     write_header = True
     for batch in itertools.batched(records, 10000):
-        _write(output, batch, records, write_header=write_header)
+        _write(
+            output,
+            batch,
+            records,
+            write_header=write_header,
+        )
         write_header = False
+
+    total_time = time.monotonic() - start_time
+
+    if config.timing:
+        output.write("Time: {:.3f} ms\n".format(total_time * 1000))
 
     if pager is not None:
         pager.communicate()
