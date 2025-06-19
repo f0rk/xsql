@@ -20,6 +20,7 @@ class Configuration:
         prompt1="%/=# ",
         prompt2="%/-# ",
         encoding=None,
+        quiet=False,
         sets=None,
     ):
 
@@ -37,6 +38,7 @@ class Configuration:
         self.prompt1 = prompt1
         self.prompt2 = prompt2
         self.encoding = encoding
+        self.quiet = quiet
 
         if sets is None:
             sets = []
@@ -116,7 +118,9 @@ def process_command_with_boolean(command, line, default=None):
 
 def set_null_display(value):
     config.null = value
-    sys.stdout.write('Null display is "{}".\n'.format(value))
+
+    if not config.quiet:
+        sys.stdout.write('Null display is "{}".\n'.format(value))
 
 
 def set_timing(value):
@@ -126,7 +130,8 @@ def set_timing(value):
     else:
         display_value = "off"
 
-    sys.stdout.write("Timing is {}.\n".format(display_value))
+    if not config.quiet:
+        sys.stdout.write("Timing is {}.\n".format(display_value))
 
 
 def set_highlight(value):
@@ -136,7 +141,8 @@ def set_highlight(value):
     else:
         display_value = "off"
 
-    sys.stdout.write("Highlight is {}.\n".format(display_value))
+    if not config.quiet:
+        sys.stdout.write("Highlight is {}.\n".format(display_value))
 
 
 def process_config_line(conn, filename, line_number, line):
@@ -178,10 +184,11 @@ def process_config_line(conn, filename, line_number, line):
         start_time = time.monotonic()
         conn.execute(text(line).execution_options(autocommit=True))
 
-        if re.search("^set", line, flags=re.I):
-            sys.stdout.write("SET\n")
-        elif re.search("^select", line, flags=re.I):
-            sys.stdout.write("SELECT\n")
+        if not config.quiet:
+            if re.search("^set", line, flags=re.I):
+                sys.stdout.write("SET\n")
+            elif re.search("^select", line, flags=re.I):
+                sys.stdout.write("SELECT\n")
 
         total_time = time.monotonic() - start_time
         if config.timing:

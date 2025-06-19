@@ -57,6 +57,9 @@ def run(args):
 
     conn = connect(args)
 
+    if args.quiet:
+        config.quiet = args.quiet
+
     config.load(conn)
 
     if args.command:
@@ -66,7 +69,7 @@ def run(args):
         run_file(conn, args.file, output=args.output, autocommit=True)
         clean_exit(conn)
 
-    if not args.quiet:
+    if not config.quiet:
         sys.stdout.write("xsql ({})\n".format(__version__))
         sys.stdout.write('Type "help" for help.\n\n')
 
