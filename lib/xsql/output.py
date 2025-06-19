@@ -70,6 +70,11 @@ def write(records, title=None, show_rowcount=False):
 def as_str(v):
     if v is None:
         return config.null
+    if isinstance(v, bool):
+        if v is True:
+            return "t"
+        elif v is False:
+            return "f"
     if isinstance(v, datetime):
         return v.isoformat()
     if isinstance(v, Decimal):
@@ -78,7 +83,11 @@ def as_str(v):
         return "{0:f}".format(v)
     if isinstance(v, set):
         v = [*v]
-        return str(v)
+        return list_to_array(v)
+    if isinstance(v, list):
+        return list_to_array(v)
+    if isinstance(v, bytes):
+        return v.hex()
     return str(v)
 
 
@@ -217,3 +226,21 @@ def write_extended(output, records, result, total_rows, title=None, write_title=
             output.write("\n")
 
     return row_count
+
+
+def format_array_entry(value):
+    if re.search("[a-zA-Z0-9_-]", value):
+        return value
+    return '"' + re.sub(r'"', '\\"', value) + '"'
+
+
+def convert_array_value(value):
+    if value is None:
+        return "NULL"
+
+    return format_array_entry(str(value))
+
+
+def list_to_array(values):
+    converted = [convert_array_value(v) for v in values]
+    return "{" + ",".join(converted) + "}"
