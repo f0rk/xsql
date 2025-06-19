@@ -1,3 +1,4 @@
+import csv
 import itertools
 import re
 import shlex
@@ -14,7 +15,12 @@ def write(records, title=None, show_rowcount=False):
 
     pager = None
 
-    if config.pager:
+    use_pager = (
+        config.pager
+        and not config.format_ == "csv"
+    )
+
+    if use_pager:
         args = shlex.split(config.pager)
         pager = subprocess.Popen(args, stdin=subprocess.PIPE, text=True)
         output = pager.stdin
@@ -41,8 +47,27 @@ def write(records, title=None, show_rowcount=False):
                 write_title=write_title,
             )
             write_title = False
+        elif config.format_ == "csv":
+            total_rows += write_csv(
+                output,
+                batch,
+                records,
+                write_header=write_header,
+            )
+            write_header = False
+        elif config.format_ == "unaligned":
+            total_rows += write_unaligned(
+                output,
+                batch,
+                records,
+                title=title,
+                write_title=write_title,
+                write_header=write_header,
+            )
+            write_title = False
+            write_header = False
         else:
-            total_rows += write_rows(
+            total_rows += write_aligned(
                 output,
                 batch,
                 records,
@@ -58,6 +83,7 @@ def write(records, title=None, show_rowcount=False):
         and (
             not config.extended_display
             and not config.tuples_only
+            and not config.format_ == "csv"
         )
     )
 
@@ -66,12 +92,16 @@ def write(records, title=None, show_rowcount=False):
         if total_rows != 1:
             output.write("s")
         output.write(")\n")
-    output.write("\n")
+
+    if not config.format_ == "csv":
+        output.write("\n")
 
     if pager is not None:
         pager.communicate()
 
-    if config.timing:
+    do_write_timing = config.timing
+
+    if do_write_timing:
         sys.stdout.write("Time: {:.3f} ms\n".format(total_time * 1000))
 
 
@@ -99,7 +129,7 @@ def as_str(v):
     return str(v)
 
 
-def write_rows(output, records, result, title=None, write_title=True, write_header=True):
+def write_aligned(output, records, result, title=None, write_title=True, write_header=True):
 
     max_field_sizes = {}
     number_looking_fields = {}
@@ -172,6 +202,33 @@ def write_rows(output, records, result, title=None, write_title=True, write_head
     return row_count
 
 
+def write_unaligned(output, records, result, title=None, write_title=True, write_header=True):
+
+    fieldnames = list(result.keys())
+
+    if write_title and title is not None:
+        output.write(title)
+        output.write("\n")
+
+    if write_header:
+        output.write("|".join(fieldnames))
+        output.write("\n")
+
+    row_count = 0
+
+    for raw in records:
+
+        row_count += 1
+
+        record = raw._asdict()
+
+        values = [as_str(record[f]) for f in fieldnames]
+        output.write("|".join(values))
+        output.write("\n")
+
+    return row_count
+
+
 def write_extended(output, records, result, total_rows, title=None, write_title=True):
 
     row_count = 0
@@ -232,6 +289,26 @@ def write_extended(output, records, result, total_rows, title=None, write_title=
 
             output.write(record_fmt_str.format(record["column"], record["value"]))
             output.write("\n")
+
+    return row_count
+
+
+def write_csv(output, records, result, write_header=True):
+
+    fieldnames = list(result.keys())
+
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    if write_header:
+        writer.writeheader()
+
+    row_count = 0
+
+    for raw in records:
+        row_count += 1
+
+        data = {key: as_str(value) for key, value in raw._asdict().items()}
+
+        writer.writerow(data)
 
     return row_count
 

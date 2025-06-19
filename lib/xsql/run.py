@@ -6,7 +6,15 @@ import tempfile
 from prompt_toolkit.buffer import Buffer
 from sqlalchemy import text
 
-from .config import config, set_extended_display, set_timing, set_tuples_only
+from .config import (
+    config,
+    process_command_with_variable,
+    set_extended_display,
+    set_format,
+    set_null_display,
+    set_timing,
+    set_tuples_only,
+)
 from .exc import QuitException
 from .history import history
 from .output import write
@@ -134,22 +142,31 @@ def run_metacommand(conn, metacommand, rest, output=None, autocommit=None):
         metacommand_help_main(output=output)
     elif metacommand == "q":
         raise QuitException()
-    elif metacommand in ("timing", "x", "t"):
+    elif metacommand in ("timing", "x", "t", "a"):
 
         config_attr = {
             "timing": "timing",
             "x": "extended_display",
             "t": "tuples_only",
+            "a": "format_",
         }[metacommand]
 
         set_function = {
             "timing": set_timing,
             "x": set_extended_display,
             "t": set_tuples_only,
+            "a": set_format,
         }[metacommand]
 
         if not rest:
-            value = not getattr(config, config_attr)
+            if metacommand == "a":
+                value = getattr(config, config_attr)
+                if value != "aligned":
+                    value = "aligned"
+                else:
+                    value = "unaligned"
+            else:
+                value = not getattr(config, config_attr)
         else:
             if rest in ("on", "true"):
                 value = True
@@ -166,6 +183,8 @@ def run_metacommand(conn, metacommand, rest, output=None, autocommit=None):
                 return
 
         set_function(value)
+    elif metacommand == "pset":
+        metacommand_pset(rest, output=output)
     else:
         handle_invalid_command(metacommand, output)
 
@@ -275,6 +294,21 @@ def metacommand_describe_tables(conn, target, output=None, autocommit=None):
         autocommit=autocommit,
         title="List of relations",
     )
+
+
+@resolve_options
+def metacommand_pset(target, output=None):
+    variable, value = process_command_with_variable(None, target)
+
+    if variable == "null":
+        set_null_display(value)
+    elif variable == "format":
+        set_format(value)
+    else:
+        sys.stderr.write(
+            "xsql error: \\pset: unknown option: {}\n"
+            .format(variable)
+        )
 
 
 def run_editor(text):

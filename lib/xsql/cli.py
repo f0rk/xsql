@@ -75,7 +75,7 @@ def run(args):
         config.tuples_only = args.tuples_only
 
     if args.csv:
-        config.csv = args.csv
+        config.format_ = "csv"
 
     if args.command:
         run_command(conn, args.command, output=args.output, autocommit=True)
