@@ -159,7 +159,7 @@ def process_config_line(conn, filename, line_number, line):
 
         total_time = time.monotonic() - start_time
         if config.timing:
-            sys.stdout.write("Time: {:.3f} ms\n".format(total_time))
+            sys.stdout.write("Time: {:.3f} ms\n".format(total_time * 1000))
 
 
 config = Configuration()
