@@ -13,7 +13,7 @@ class Configuration:
         autocommit=True,
         null="<NÜLLZØR>",
         pager=None,
-        highlight=True,
+        highlight=False,
         timing=False,
         prompt1="%/=# ",
         prompt2="%/-# ",
@@ -28,7 +28,7 @@ class Configuration:
             pager = os.environ.get("PAGER")
 
         self.pager = pager
-        self.highlight = True
+        self.highlight = highlight
         self.timing = timing
         self.prompt1 = prompt1
         self.prompt2 = prompt2
@@ -99,6 +99,17 @@ def process_command_with_value(command, line, default=None):
     return remainder
 
 
+def process_command_with_boolean(command, line, default=None):
+    value = process_command_with_value(command, line, default=default)
+
+    if value in (True, "on"):
+        value = True
+    else:
+        value = False
+
+    return value
+
+
 def set_null_display(value):
     config.null = value
     sys.stdout.write('Null display is "{}".\n'.format(value))
@@ -112,6 +123,16 @@ def set_timing(value):
         display_value = "off"
 
     sys.stdout.write("Timing is {}.\n".format(display_value))
+
+
+def set_highlight(value):
+    config.highlight = value
+    if value:
+        display_value = "on"
+    else:
+        display_value = "off"
+
+    sys.stdout.write("Highlight is {}.\n".format(display_value))
 
 
 def process_config_line(conn, filename, line_number, line):
@@ -130,14 +151,11 @@ def process_config_line(conn, filename, line_number, line):
                 )
             )
     elif line == "\\timing":
-        value = process_command_with_value("\\timing", line, default=True)
-
-        if value in (True, "on"):
-            value = True
-        else:
-            value = False
-
+        value = process_command_with_boolean("\\timing", line, default=True)
         set_timing(value)
+    elif line == "\\highlight":
+        value = process_command_with_boolean("\\highlight", line, default=True)
+        set_highlight(value)
     elif line.startswith("\\set"):
         variable, value = process_command_with_variable("\\set", line)
 
