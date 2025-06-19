@@ -94,6 +94,8 @@ def run(args):
 
                     if not is_postgres:
                         sys.stdout.write(exc.orig.args[0])
+                        if not exc.orig.args[0].endswith("\n"):
+                            sys.stdout.write("\n")
                     else:
                         sys.stdout.write(
                             "ERROR:  {}: {}\n"
