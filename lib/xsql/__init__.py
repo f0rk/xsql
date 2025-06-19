@@ -1,8 +1,9 @@
 # Copyright 2025, Ryan P. Kelly.
 
 from .cli import run
+from .version import __version__
 
-__version__ = "5.4"
 __all__ = [
+    "__version__",
     "run",
 ]

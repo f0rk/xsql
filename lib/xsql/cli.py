@@ -1,3 +1,4 @@
+import os.path
 import re
 import sys
 import time
@@ -12,8 +13,11 @@ from pygments.lexers import sql
 
 from .config import config
 from .db import connect
+from .exc import QuitException
+from .history import FileHistory
 from .prompt import render_prompt
 from .run import is_maybe_metacommand, run_command, run_file
+from .version import __version__
 
 
 bindings = KeyBindings()
@@ -62,6 +66,10 @@ def run(args):
         run_file(conn, args.file, output=args.output, autocommit=True)
         clean_exit(conn)
 
+    if not args.quiet:
+        sys.stdout.write("xsql ({})\n".format(__version__))
+        sys.stdout.write('Type "help" for help.\n\n')
+
     prompt_args = {
         "vi_mode": True,
         "enable_open_in_editor": True,
@@ -77,6 +85,9 @@ def run(args):
             lexer_class = sql.MySqlLexer
 
         prompt_args["lexer"] = PygmentsLexer(lexer_class)
+
+    if config.history_size:
+        prompt_args["history"] = FileHistory(os.path.expanduser("~/.xsql_history"))
 
     session = PromptSession(**prompt_args)
 
@@ -126,6 +137,8 @@ def run(args):
                         conn.rollback()
 
         except EOFError:
+            clean_exit(conn)
+        except QuitException:
             clean_exit(conn)
         except KeyboardInterrupt:
             pass

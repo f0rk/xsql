@@ -14,6 +14,8 @@ class Configuration:
         null="<NÜLLZØR>",
         pager=None,
         highlight=False,
+        history_size=500,
+        verbosity=None,
         timing=False,
         prompt1="%/=# ",
         prompt2="%/-# ",
@@ -29,6 +31,8 @@ class Configuration:
 
         self.pager = pager
         self.highlight = highlight
+        self.history_size = history_size
+        self.verbosity = verbosity
         self.timing = timing
         self.prompt1 = prompt1
         self.prompt2 = prompt2
@@ -163,6 +167,10 @@ def process_config_line(conn, filename, line_number, line):
             config.prompt1 = value
         elif variable.lower() == "prompt2":
             config.prompt2 = value
+        elif variable.lower() == "histsize":
+            config.history_size = int(value)
+        elif variable.lower() == "verbosity":
+            config.verbosity = value
         else:
             pass
     else:
