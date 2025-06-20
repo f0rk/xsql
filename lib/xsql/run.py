@@ -21,8 +21,10 @@ from .config import (
     set_tuples_only,
 )
 from .exc import QuitException
+from .formatters import CopyWriter
 from .history import history
-from .output import write
+from .output import write, write_csv
+from .parsers import parse_copy
 from .postgres import get_command_status
 from .time import write_time
 
@@ -84,9 +86,9 @@ def run_command(conn, command, title=None, show_rowcount=True, extra_content=Non
         status = None
 
         if isinstance(command, str):
-            if match := re.search(r"^\s*((create|drop)\s+(\w+))", command, flags=re.I):
+            if match := re.search(r"^\s*((create|drop)\s+(materialized\s+)?(\w+))", command, flags=re.I):
                 status = match.groups()[0]
-            elif match := re.search(r"^\s*(insert|update|delete|truncate|analyze|vacuum)\b", command, flags=re.I):
+            elif match := re.search(r"^\s*(insert|update|delete|truncate|analyze|vacuum|copy)\b", command, flags=re.I):
                 status = match.groups()[0]
 
             command = text(command)
@@ -139,9 +141,155 @@ def run_file(conn, file):
         pass
 
 
+def build_native_copy(query, options):
+    statement = "copy (" + query + ") " + options.direction
+
+    if options.direction == "to":
+        statement += " stdout"
+    else:
+        statement += " stdin"
+
+    statement += " with (format " + options.format_
+
+    if options.null:
+        statement += " null '" + options.null + "'"
+
+    if options.header:
+        statement += " header"
+
+    if options.quote:
+        statement += " quote '" + options.quote + "'"
+
+    if options.escape:
+        statement += " escape '" + options.escape + "'"
+
+    statement += ")"
+
+    return statement
+
+
+def run_copy(conn, command):
+
+    query, options = parse_copy("copy " + command)
+
+    total_time = None
+    total_rows = None
+
+    if conn.dialect.name == "postgresql":
+
+        statement = build_native_copy(query, options)
+
+        closable = None
+
+        try:
+
+            if options.target_type == "file":
+                closable = open(options.target, "wt")
+                fp = closable
+            elif options.target_type == "pipe":
+                if options.target == "stdout":
+                    fp = sys.stdout
+                else:
+                    fp = sys.stdin
+            elif options.target_type == "program":
+                sys.stderr.write("copy program is not implemented\n")
+                sys.stderr.flush()
+                return
+
+            start_time = time.monotonic_ns()
+            with conn._dbapi_connection.cursor() as curs:
+                curs.copy_expert(statement, fp)
+                total_rows = curs.rowcount
+            total_time = time.monotonic_ns() - start_time
+        finally:
+            if closable is not None:
+                closable.close()
+
+    else:
+
+        if options.direction == "from":
+            sys.stderr.write(
+                "copy from is not implemented for {}\n"
+                .format(conn.dialect.name)
+            )
+            sys.stderr.flush()
+            return
+
+        try:
+
+            if options.target_type == "file":
+                closable = open(options.target, "wt")
+                fp = closable
+            elif options.target_type == "pipe":
+                if options.target == "stdout":
+                    fp = sys.stdout
+                else:
+                    fp = sys.stdin
+            elif options.target_type == "program":
+                sys.stderr.write("copy program is not implemented\n")
+                sys.stderr.flush()
+                return
+
+            if options.format_ == "text":
+                writer = CopyWriter(
+                    fp,
+                    null=(options.null or "\\N"),
+                    delimiter=(options.delimiter or "\t"),
+                )
+
+                start_time = time.monotonic_ns()
+                results = conn.execute(text(query))
+
+                total_rows = 0
+                for result in results:
+                    total_rows += 1
+                    writer.writerow(result)
+
+                total_time = time.monotonic_ns() - start_time
+            elif options.format_ == "csv":
+                start_time = time.monotonic_ns()
+                results = conn.execute(text(query))
+
+                total_rows = write_csv(
+                    fp,
+                    results,
+                    results,
+                    write_header=options.header,
+                    delimiter=(options.delimiter or ","),
+                )
+
+                total_time = time.monotonic_ns() - start_time
+            else:
+                sys.stderr.write(
+                    "copy format {} is not implemented\n"
+                    .format(options.format_)
+                )
+                sys.stderr.flush()
+                return
+
+        finally:
+            if closable is not None:
+                closable.close()
+
+    if total_time is not None:
+        if options.target_type != "pipe":
+            if total_rows is not None:
+                sys.stdout.write("COPY {}\n".format(total_rows))
+            else:
+                sys.stdout.write("COPY\n")
+            sys.stdout.flush()
+
+        do_write_timing = config.timing
+
+        if do_write_timing:
+            write_time(total_time)
+
+
 def run_metacommand(conn, metacommand, rest):
     if metacommand == "i":
         run_file(conn, strip(rest))
+    elif metacommand == "copy":
+        run_copy(conn, strip(rest))
     elif metacommand == "o":
         set_output(strip(rest))
     elif metacommand == "e":
@@ -227,7 +375,11 @@ def handle_invalid_command_value(command, value, expected=None):
 
 def metacommand_help():
     sys.stdout.write("Input/Output\n")
+    sys.stdout.write("  \\copy ...              perform SQL COPY with data stream to the client host\n")
     sys.stdout.write("  \\i FILE                execute commands from file\n")
+    sys.stdout.write("Informational\n")
+    sys.stdout.write("  \\d                     list tables and views\n")
+    sys.stdout.write("  \\d      NAME           describe table or view\n")
     sys.stdout.flush()
 
 
