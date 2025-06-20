@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 import sys
 import time
@@ -17,6 +18,7 @@ from .exc import QuitException
 from .history import history
 from .prompt import render_prompt
 from .run import is_maybe_metacommand, run_command, run_file
+from .time import write_time
 from .version import __version__
 
 
@@ -140,7 +142,7 @@ def run(args):
         "key_bindings": bindings,
     }
 
-    if config.highlight:
+    if config.syntax:
         lexer_class = sql.SqlLexer
         if conn.dialect.name in ("postgresql", "redshift"):
             lexer_class = sql.PostgresLexer
@@ -151,6 +153,12 @@ def run(args):
 
     if config.history_size:
         prompt_args["history"] = history
+
+    if config.color:
+        pass
+    else:
+        if not os.environ.get("PROMPT_TOOLKIT_COLOR_DEPTH"):
+            os.environ["PROMPT_TOOLKIT_COLOR_DEPTH"] = "DEPTH_1_BIT"
 
     session = PromptSession(**prompt_args)
 
@@ -194,7 +202,7 @@ def run(args):
                         conn.connection.notices.clear()
 
                     if config.timing:
-                        sys.stdout.write("Time: {:.3} ms\n".format(total_time * 1000))
+                        write_time(total_time)
 
                     sys.stdout.flush()
 
@@ -204,6 +212,8 @@ def run(args):
                         config.run_sets(conn)
 
         except EOFError:
+            if not config.quiet:
+                sys.stdout.write("\\q\n")
             clean_exit(conn)
         except QuitException:
             clean_exit(conn)

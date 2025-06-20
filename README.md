@@ -33,6 +33,8 @@ dialects.
 \set PROMPT2 '> '
 \pset null '<NÜLLZØR>'
 \timing
+\syntax on
+\color on
 
 [postgresql]
 set time zone 'America/New_York';

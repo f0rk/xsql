@@ -9,6 +9,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from .config import config
+from .time import write_time
 
 
 def write(records, title=None, show_rowcount=False):
@@ -105,7 +106,7 @@ def write(records, title=None, show_rowcount=False):
     do_write_timing = config.timing
 
     if do_write_timing:
-        sys.stdout.write("Time: {:.3f} ms\n".format(total_time * 1000))
+        write_time(total_time)
 
 
 def as_str(v):
