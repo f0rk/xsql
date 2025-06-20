@@ -22,6 +22,7 @@ class Configuration:
         encoding=None,
         quiet=False,
         extended_display=False,
+        tuples_only=False,
         sets=None,
     ):
 
@@ -41,6 +42,7 @@ class Configuration:
         self.encoding = encoding
         self.quiet = quiet
         self.extended_display = extended_display
+        self.tuples_only = tuples_only
 
         if sets is None:
             sets = []
@@ -155,6 +157,17 @@ def set_extended_display(value):
         sys.stdout.write("Extended display is {}.\n".format(display_value))
 
 
+def set_tuples_only(value):
+    config.tuples_only = value
+    if value:
+        display_value = "on"
+    else:
+        display_value = "off"
+
+    if not config.quiet:
+        sys.stdout.write("Tuples only is {}.\n".format(display_value))
+
+
 def set_highlight(value):
     config.highlight = value
     if value:
@@ -183,17 +196,23 @@ def process_config_line(conn, filename, line_number, line):
                     variable,
                 )
             )
-    elif line == "\\timing":
+    elif line.startswith("\\timing"):
         run_metacommand(
             None,
             "timing",
             get_remainder("\\timing", line),
         )
-    elif line == "\\x":
+    elif line.startswith("\\x"):
         run_metacommand(
             None,
             "x",
             get_remainder("\\x", line),
+        )
+    elif line.startswith("\\t"):
+        run_metacommand(
+            None,
+            "t",
+            get_remainder("\\t", line),
         )
     elif line == "\\highlight":
         value = process_command_with_boolean("\\highlight", line, default=not config.highlight)

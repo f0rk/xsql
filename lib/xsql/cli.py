@@ -59,12 +59,23 @@ def try_close(conn):
 
 def run(args):
 
+    if args.version:
+        sys.stdout.write("xsql {}\n".format(__version__))
+        sys.exit(0)
+
     conn = connect(args)
 
     if args.quiet:
         config.quiet = args.quiet
 
-    config.load(conn)
+    if not args.no_xsqlrc:
+        config.load(conn)
+
+    if args.tuples_only:
+        config.tuples_only = args.tuples_only
+
+    if args.csv:
+        config.csv = args.csv
 
     if args.command:
         run_command(conn, args.command, output=args.output, autocommit=True)
