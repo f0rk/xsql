@@ -2,4 +2,4 @@ import sys
 
 
 def write_time(total_time):
-    sys.stdout.write("Time: {:.3} ms\n".format(total_time * 1000))
+    sys.stdout.write("Time: {:.3} ms\n".format(float(total_time) * 1000))

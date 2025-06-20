@@ -107,24 +107,20 @@ def run(args):
 
     if command:
 
-        autocommit = True
         if args.single_transaction:
             conn.execute(sqlalchemy.text("begin;"))
-            autocommit = False
 
-        run_command(conn, command, output=config.output, autocommit=autocommit)
+        run_command(conn, command)
         if args.single_transaction:
             conn.execute(sqlalchemy.text("commit;"))
 
         clean_exit(conn)
     elif args.file:
 
-        autocommit = True
         if args.single_transaction:
             conn.execute(sqlalchemy.text("begin;"))
-            autocommit = False
 
-        run_file(conn, args.file, output=config.output, autocommit=True)
+        run_file(conn, args.file)
         if args.single_transaction:
             conn.execute(sqlalchemy.text("commit;"))
 
@@ -176,7 +172,7 @@ def run(args):
             if text.strip():
                 start_time = time.monotonic()
                 try:
-                    run_command(conn, text, autocommit=config.autocommit)
+                    run_command(conn, text)
                 except sqlalchemy.exc.SQLAlchemyError as exc:
                     total_time = time.monotonic() - start_time
                     is_postgres = False
