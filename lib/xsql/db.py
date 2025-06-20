@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 from .config import config
 
@@ -17,6 +17,12 @@ def make_engine(url):
 
 def connect(args):
     engine = make_engine(args.url)
-    conn = engine.connect().execution_options(isolation_level=config.isolation_level)
+    conn = engine.connect()
+
+    if conn.dialect.name == "snowflake":
+        if config.isolation_level == "AUTOCOMMIT":
+            conn.execute(text("ALTER SESSION SET AUTOCOMMIT = TRUE"))
+    else:
+        conn = conn.execution_options(isolation_level=config.isolation_level)
 
     return conn
