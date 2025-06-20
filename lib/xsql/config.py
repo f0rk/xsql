@@ -10,6 +10,7 @@ class Configuration:
 
     def __init__(
         self,
+        output=None,
         autocommit=True,
         null="<NÜLLZØR>",
         pager=None,
@@ -26,6 +27,11 @@ class Configuration:
         format_="aligned",
         sets=None,
     ):
+
+        if output is None:
+            output = sys.stdout
+
+        self.output = output
 
         self.autocommit = autocommit
         self.null = null
@@ -140,9 +146,19 @@ def set_null_display(value):
         sys.stdout.write('Null display is "{}".\n'.format(value))
 
 
+def set_output(value):
+    if config.output is not sys.stdout and config.output is not sys.stderr:
+        config.output.close()
+
+    if not value:
+        config.output = sys.stdout
+    else:
+        config.output = open(value, "wt")
+
+
 def set_format(value):
     if value not in ("aligned", "unaligned", "csv"):
-        sys.stderr.write("\pset: allowed formats are aligned, csv, unaligned\n")
+        sys.stderr.write("\\pset: allowed formats are aligned, csv, unaligned\n")
         return
 
     config.format_ = value

@@ -12,6 +12,7 @@ from .config import (
     set_extended_display,
     set_format,
     set_null_display,
+    set_output,
     set_timing,
     set_tuples_only,
 )
@@ -45,7 +46,7 @@ def is_maybe_metacommand(command):
 def resolve_options(func):
     def wrapper(*args, **kwargs):
         if "output" in kwargs and kwargs["output"] is None:
-            kwargs["output"] = sys.stdout
+            kwargs["output"] = config.output
         if "autocommit" in kwargs and kwargs["autocommit"] is None:
             kwargs["autocommit"] = config.autocommit
 
@@ -74,7 +75,7 @@ def run_command(conn, command, output=None, autocommit=None, title=None):
     if isinstance(command, str) and is_maybe_metacommand(command):
         match = get_metacommand(command)
         if not match:
-            handle_invalid_command(command, output)
+            handle_invalid_command(command, sys.stderr)
             return
 
         metacommand, rest = match.groups()
@@ -114,6 +115,8 @@ def run_file(conn, file, output=None, autocommit=None):
 def run_metacommand(conn, metacommand, rest, output=None, autocommit=None):
     if metacommand == "i":
         run_file(conn, strip(rest), output=output, autocommit=autocommit)
+    elif metacommand == "o":
+        set_output(strip(rest))
     elif metacommand == "e":
         query = run_editor(rest)
         run_command(
@@ -137,9 +140,9 @@ def run_metacommand(conn, metacommand, rest, output=None, autocommit=None):
             autocommit=autocommit,
         )
     elif metacommand == "?":
-        metacommand_help(output=output)
+        metacommand_help(output=sys.stdout)
     elif metacommand == "??":
-        metacommand_help_main(output=output)
+        metacommand_help_main(output=sys.stdout)
     elif metacommand == "q":
         raise QuitException()
     elif metacommand in ("timing", "x", "t", "a"):
@@ -177,16 +180,16 @@ def run_metacommand(conn, metacommand, rest, output=None, autocommit=None):
                     metacommand,
                     rest,
                     expected="Boolean expected",
-                    output=output,
+                    output=sys.stderr,
                 )
                 set_function(getattr(config, config_attr))
                 return
 
         set_function(value)
     elif metacommand == "pset":
-        metacommand_pset(rest, output=output)
+        metacommand_pset(rest, output=sys.stdout)
     else:
-        handle_invalid_command(metacommand, output)
+        handle_invalid_command(metacommand, sys.stderr)
 
 
 @resolve_options
@@ -318,7 +321,7 @@ def run_editor(text):
     if not text:
         add_to_history = True
         for entry in history.load_history_strings():
-            if entry.strip().startswith("\e"):
+            if entry.strip().startswith("\\e"):
                 continue
 
             text = entry

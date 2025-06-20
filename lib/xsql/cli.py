@@ -77,11 +77,14 @@ def run(args):
     if args.csv:
         config.format_ = "csv"
 
+    if args.output:
+        config.output = open(args.output, "wt")
+
     if args.command:
-        run_command(conn, args.command, output=args.output, autocommit=True)
+        run_command(conn, args.command, output=config.output, autocommit=True)
         clean_exit(conn)
     elif args.file:
-        run_file(conn, args.file, output=args.output, autocommit=True)
+        run_file(conn, args.file, output=config.output, autocommit=True)
         clean_exit(conn)
 
     if not config.quiet:
