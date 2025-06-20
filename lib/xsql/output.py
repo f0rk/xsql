@@ -140,45 +140,45 @@ def write_aligned(output, records, result, title=None, write_title=True, write_h
 
     row_count = 0
 
+    fieldnames = list(result.keys())
+
     for raw in records:
 
         row_count += 1
 
-        record = raw._asdict()
+        for idx, key in enumerate(fieldnames):
 
-        for key, value in record.items():
+            value = raw[idx]
 
             str_value = as_str(value)
 
-            if key not in max_field_sizes:
-                max_field_sizes[key] = len(str_value)
-            if max_field_sizes[key] < len(str_value):
-                max_field_sizes[key] = len(str_value)
-            if max_field_sizes[key] < len(key):
-                max_field_sizes[key] = len(key)
+            if idx not in max_field_sizes:
+                max_field_sizes[idx] = len(str_value)
+            if max_field_sizes[idx] < len(str_value):
+                max_field_sizes[idx] = len(str_value)
+            if max_field_sizes[idx] < len(key):
+                max_field_sizes[idx] = len(key)
 
             if key not in number_looking_fields:
-                number_looking_fields[key] = True
+                number_looking_fields[idx] = True
 
             if isinstance(value, (int, float, Decimal)):
                 pass
             elif not re.search(r'^-?([1-9]+[0-9]*|0)(\.[0-9]+)?$', str_value):
-                number_looking_fields[key] = False
-
-    fieldnames = list(result.keys())
+                number_looking_fields[idx] = False
 
     header_fmt_parts = []
     record_fmt_parts = []
     sep_parts = []
-    for field in fieldnames:
-        header_fmt_parts.append(" {:^" + str(max_field_sizes[field]) + "} ")
+    for idx, _ in enumerate(fieldnames):
+        header_fmt_parts.append(" {:^" + str(max_field_sizes[idx]) + "} ")
 
         align = "<"
-        if number_looking_fields[field]:
+        if number_looking_fields[idx]:
             align = ">"
 
-        record_fmt_parts.append(" {:" + align + str(max_field_sizes[field]) + "} ")
-        sep_parts.append("-" + ("-" * max_field_sizes[field]) + "-")
+        record_fmt_parts.append(" {:" + align + str(max_field_sizes[idx]) + "} ")
+        sep_parts.append("-" + ("-" * max_field_sizes[idx]) + "-")
 
     header_fmt_str = "|".join(header_fmt_parts)
     record_fmt_str = "|".join(record_fmt_parts)
@@ -196,10 +196,7 @@ def write_aligned(output, records, result, title=None, write_title=True, write_h
         output.write("\n")
 
     for raw in records:
-
-        record = raw._asdict()
-
-        values = [as_str(record[f]) for f in fieldnames]
+        values = [as_str(v) for v in raw]
         output.write(record_fmt_str.format(*values))
         output.write("\n")
 
@@ -224,9 +221,7 @@ def write_unaligned(output, records, result, title=None, write_title=True, write
 
         row_count += 1
 
-        record = raw._asdict()
-
-        values = [as_str(record[f]) for f in fieldnames]
+        values = [as_str(v) for v in raw]
         output.write(config.field_separator.join(values))
         output.write(config.record_separator)
 
@@ -241,6 +236,8 @@ def write_extended(output, records, result, total_rows, title=None, write_title=
 
     max_column_size = None
     max_value_size = None
+
+    fieldnames = list(result.keys())
 
     for raw in records:
 
@@ -257,9 +254,9 @@ def write_extended(output, records, result, total_rows, title=None, write_title=
         max_column_size = len("[ RECORD {} ]".format(row_number))
         max_value_size = 0
 
-        record = raw._asdict()
+        for idx, key in enumerate(fieldnames):
 
-        for key, value in record.items():
+            value = raw[idx]
 
             str_value = as_str(value)
 
@@ -301,18 +298,16 @@ def write_csv(output, records, result, write_header=True):
 
     fieldnames = list(result.keys())
 
-    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer = csv.writer(output)
     if write_header:
-        writer.writeheader()
+        writer.writerow(fieldnames)
 
     row_count = 0
 
     for raw in records:
         row_count += 1
 
-        data = {key: as_str(value) for key, value in raw._asdict().items()}
-
-        writer.writerow(data)
+        writer.writerow([as_str(v) for v in raw])
 
     return row_count
 
