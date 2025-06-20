@@ -48,18 +48,6 @@ def is_maybe_metacommand(command):
     return command.strip().startswith("\\")
 
 
-def resolve_options(func):
-    def wrapper(*args, **kwargs):
-        if "output" in kwargs and kwargs["output"] is None:
-            kwargs["output"] = config.output
-        if "autocommit" in kwargs and kwargs["autocommit"] is None:
-            kwargs["autocommit"] = config.autocommit
-
-        return func(*args, **kwargs)
-
-    return wrapper
-
-
 def strip(v):
     if v is not None:
         v = v.strip()
@@ -74,8 +62,7 @@ def glob_to_like(v):
     return v.replace("*", "%")
 
 
-@resolve_options
-def run_command(conn, command, output=None, autocommit=None, title=None):
+def run_command(conn, command, title=None):
 
     if isinstance(command, str) and is_maybe_metacommand(command):
         match = get_metacommand(command)
@@ -89,8 +76,6 @@ def run_command(conn, command, output=None, autocommit=None, title=None):
             conn,
             metacommand,
             rest,
-            output=output,
-            autocommit=autocommit,
         )
     else:
 
@@ -107,7 +92,7 @@ def run_command(conn, command, output=None, autocommit=None, title=None):
 
             command = text(command)
 
-        if autocommit:
+        if config.autocommit:
             conn.execute(text("begin;"))
 
         start_time = time.monotonic()
@@ -140,58 +125,41 @@ def run_command(conn, command, output=None, autocommit=None, title=None):
 
             write_time(total_time)
 
-        if autocommit:
+        if config.autocommit:
             conn.execute(text("commit;"))
 
 
-@resolve_options
-def run_file(conn, file, output=None, autocommit=None):
+def run_file(conn, file):
 
     with open(file, "rt") as fp:
         query = fp.read()
 
-    results = conn.execute(text(query).execution_options(autocommit=autocommit))
+    results = conn.execute(text(query).execution_options(autocommit=config.autocommit))
     try:
         write(results)
     except BrokenPipeError:
         pass
 
-    if autocommit:
+    if config.autocommit:
         conn.execute(text("commit;"))
 
 
-@resolve_options
-def run_metacommand(conn, metacommand, rest, output=None, autocommit=None):
+def run_metacommand(conn, metacommand, rest):
     if metacommand == "i":
-        run_file(conn, strip(rest), output=output, autocommit=autocommit)
+        run_file(conn, strip(rest))
     elif metacommand == "o":
         set_output(strip(rest))
     elif metacommand == "e":
         query = run_editor(rest)
-        run_command(
-            conn,
-            query,
-            output=output,
-            autocommit=autocommit,
-        )
+        run_command(conn, query)
     elif metacommand == "d":
-        metacommand_describe(
-            conn,
-            strip(rest),
-            output=output,
-            autocommit=autocommit,
-        )
+        metacommand_describe(conn, strip(rest))
     elif metacommand == "dt":
-        metacommand_describe_tables(
-            conn,
-            strip(rest),
-            output=output,
-            autocommit=autocommit,
-        )
+        metacommand_describe_tables(conn, strip(rest))
     elif metacommand == "?":
-        metacommand_help(output=sys.stdout)
+        metacommand_help()
     elif metacommand == "??":
-        metacommand_help_main(output=sys.stdout)
+        metacommand_help_main()
     elif metacommand == "q":
         raise QuitException()
     elif metacommand in ("timing", "x", "t", "a"):
@@ -240,54 +208,44 @@ def run_metacommand(conn, metacommand, rest, output=None, autocommit=None):
 
         set_function(value)
     elif metacommand == "pset":
-        metacommand_pset(rest, output=sys.stdout)
+        metacommand_pset(rest)
     else:
         handle_invalid_command(metacommand, sys.stderr)
 
 
-@resolve_options
-def handle_invalid_command(command, output=None):
-    output.write("invalid command ")
-    output.write(command)
-    output.write("\n")
-    output.write("Try \\? for help.\n")
-    output.flush()
+def handle_invalid_command(command):
+    sys.stderr.write("invalid command ")
+    sys.stderr.write(command)
+    sys.stderr.write("\n")
+    sys.stderr.write("Try \\? for help.\n")
+    sys.stderr.flush()
 
 
-@resolve_options
-def handle_invalid_command_value(command, value, expected=None, output=None):
-    output.write('unrecognized value "{}" for "\\{}"'.format(value, command))
+def handle_invalid_command_value(command, value, expected=None):
+    sys.stderr.write('unrecognized value "{}" for "\\{}"'.format(value, command))
     if expected:
-        output.write(": ")
-        output.write(expected)
-    output.write("\n")
-    output.flush()
+        sys.stderr.write(": ")
+        sys.stderr.write(expected)
+    sys.stderr.write("\n")
+    sys.stderr.flush()
 
 
-@resolve_options
-def metacommand_help(output=None):
-    output.write("Input/Output\n")
-    output.write("  \\i FILE                execute commands from file\n")
-    output.flush()
+def metacommand_help():
+    sys.stdout.write("Input/Output\n")
+    sys.stdout.write("  \\i FILE                execute commands from file\n")
+    sys.stdout.flush()
 
 
-@resolve_options
-def metacommand_help_main(output=None):
-    output.write("You are using xsql, the command-line interface to any database.\n")
-    output.write("Type:  \\? for help with xsql commands\n")
-    output.write("       \\q to quit\n")
-    output.flush()
+def metacommand_help_main():
+    sys.stdout.write("You are using xsql, the command-line interface to any database.\n")
+    sys.stdout.write("Type:  \\? for help with xsql commands\n")
+    sys.stdout.write("       \\q to quit\n")
+    sys.stdout.flush()
 
 
-@resolve_options
-def metacommand_describe(conn, target, output=None, autocommit=None):
+def metacommand_describe(conn, target):
     if not target:
-        metacommand_describe_tables(
-            conn,
-            target,
-            output=output,
-            autocommit=autocommit,
-        )
+        metacommand_describe_tables(conn, target)
     else:
         query = """
         select
@@ -309,16 +267,10 @@ def metacommand_describe(conn, target, output=None, autocommit=None):
 
         query = text(query).bindparams(table_name=glob_to_like(target))
 
-        run_command(
-            conn,
-            query,
-            output=output,
-            autocommit=autocommit,
-        )
+        run_command(conn, query)
 
 
-@resolve_options
-def metacommand_describe_tables(conn, target, output=None, autocommit=None):
+def metacommand_describe_tables(conn, target):
     query = """
     select
         information_schema.tables.table_schema as "Schema",
@@ -347,17 +299,10 @@ def metacommand_describe_tables(conn, target, output=None, autocommit=None):
 
     query = text(query).bindparams(target=target)
 
-    run_command(
-        conn,
-        query,
-        output=output,
-        autocommit=autocommit,
-        title="List of relations",
-    )
+    run_command(conn, query, title="List of relations")
 
 
-@resolve_options
-def metacommand_pset(target, output=None):
+def metacommand_pset(target):
     variable, value = process_command_with_variable(None, target)
 
     if variable == "null":
