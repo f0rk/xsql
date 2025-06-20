@@ -1,5 +1,19 @@
 import sys
+from decimal import Decimal
 
 
 def write_time(total_time):
-    sys.stdout.write("Time: {:.3} ms\n".format(float(total_time) * 1000))
+    formatted_ms = "{:.3f}".format(Decimal(total_time) / Decimal("100000"))
+
+    if "." in formatted_ms:
+        left, right = formatted_ms.split(".")
+    else:
+        left = formatted_ms
+        right = "0"
+
+    while len(right) < 3:
+        right = right + "0"
+
+    formatted_ms = left + "." + right
+
+    sys.stdout.write("Time: {} ms\n".format(formatted_ms))

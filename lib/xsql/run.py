@@ -90,11 +90,11 @@ def run_command(conn, command, title=None):
 
             command = text(command)
 
-        start_time = time.monotonic()
+        start_time = time.monotonic_ns()
 
         results = conn.execute(command)
 
-        total_time = time.monotonic() - start_time
+        total_time = time.monotonic_ns() - start_time
 
         if results.returns_rows:
             try:
