@@ -95,7 +95,11 @@ def run(args):
     if args.output:
         config.output = open(args.output, "wt")
 
-    command = sys.stdin.read()
+    command = None
+
+    if not sys.stdin.isatty():
+        command = sys.stdin.read()
+
     if not command:
         command = args.command
 
