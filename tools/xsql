@@ -13,6 +13,7 @@ parser.add_argument("--file", "-f", help="execute commands from file, then exit"
 parser.add_argument("--output", "-o", help="send query results to file")
 parser.add_argument("--quiet", "-q", action="store_true", help="run quietly (no messages, only query output)")
 parser.add_argument("--no-xsqlrc", "-X", action="store_true", help="do not read startup file (~/.xsqlrc)")
+parser.add_argument("--single-transaction", "-1", action="store_true", help="execute as a single transaction (if non-interactive)")
 parser.add_argument("--tuples-only", "-t", action="store_true", help="print rows only")
 parser.add_argument("--csv", action="store_true", help="CSV (Comma-Separated Values) table output mode")
 parser.add_argument("--no-align", "-A", action="store_true", help="unaligned table output mode")

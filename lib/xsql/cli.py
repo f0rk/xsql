@@ -100,10 +100,28 @@ def run(args):
         command = args.command
 
     if command:
-        run_command(conn, command, output=config.output, autocommit=True)
+
+        autocommit = True
+        if args.single_transaction:
+            conn.execute(sqlalchemy.text("begin;"))
+            autocommit = False
+
+        run_command(conn, command, output=config.output, autocommit=autocommit)
+        if args.single_transaction:
+            conn.execute(sqlalchemy.text("commit;"))
+
         clean_exit(conn)
     elif args.file:
+
+        autocommit = True
+        if args.single_transaction:
+            conn.execute(sqlalchemy.text("begin;"))
+            autocommit = False
+
         run_file(conn, args.file, output=config.output, autocommit=True)
+        if args.single_transaction:
+            conn.execute(sqlalchemy.text("commit;"))
+
         clean_exit(conn)
 
     if not config.quiet:
