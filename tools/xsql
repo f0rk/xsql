@@ -1,24 +1,32 @@
 #!/usr/bin/env python
 
 import argparse
+import sys
 
 from xsql import run
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("url", help="the url connection string", nargs="?")
-parser.add_argument("--command", "-c", help="a raw sql command to run")
-parser.add_argument("--file", "-f", help="a file to run")
-parser.add_argument("--output", "-o", help="where to write output to")
-parser.add_argument("--quiet", "-q", action="store_true", help="run quietly")
-parser.add_argument("--no-xsqlrc", "-X", action="store_true", help="do not load xsqlrc")
-parser.add_argument("--tuples-only", "-t", action="store_true", help="tuples only")
-parser.add_argument("--csv", action="store_true", help="csv output mode")
-parser.add_argument("--version", action="store_true", help="print version and exit")
+parser.add_argument("--command", "-c", help="run only single command (SQL or internal) and exit")
+parser.add_argument("--file", "-f", help="execute commands from file, then exit")
+parser.add_argument("--output", "-o", help="send query results to file")
+parser.add_argument("--quiet", "-q", action="store_true", help="run quietly (no messages, only query output)")
+parser.add_argument("--no-xsqlrc", "-X", action="store_true", help="do not read startup file (~/.xsqlrc)")
+parser.add_argument("--tuples-only", "-t", action="store_true", help="print rows only")
+parser.add_argument("--csv", action="store_true", help="CSV (Comma-Separated Values) table output mode")
+parser.add_argument("--no-align", "-A", action="store_true", help="unaligned table output mode")
+parser.add_argument("--field-separator", "-F", help='field separator for unaligned output (default: "|")')
+parser.add_argument("--field-separator-zero", "-z", action="store_true", help="set field separator for unaligned output to zero byte")
+parser.add_argument("--record-separator-zero", "-0", action="store_true", help="set record separator for unaligned output to zero byte")
+parser.add_argument("--expanded", "-x", action="store_true", help="turn on expanded table output")
+parser.add_argument("--version", "-V", action="store_true", help="output version information, then exit")
+
 
 args = parser.parse_args()
 
 if not args.url and not args.version:
+    sys.stderr.write("must specify <url>\n")
     parser.print_help()
 else:
     run(args)
