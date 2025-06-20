@@ -198,6 +198,7 @@ def handle_invalid_command(command, output=None):
     output.write(command)
     output.write("\n")
     output.write("Try \\? for help.\n")
+    output.flush()
 
 
 @resolve_options
@@ -207,12 +208,14 @@ def handle_invalid_command_value(command, value, expected=None, output=None):
         output.write(": ")
         output.write(expected)
     output.write("\n")
+    output.flush()
 
 
 @resolve_options
 def metacommand_help(output=None):
     output.write("Input/Output\n")
     output.write("  \\i FILE                execute commands from file\n")
+    output.flush()
 
 
 @resolve_options
@@ -220,6 +223,7 @@ def metacommand_help_main(output=None):
     output.write("You are using xsql, the command-line interface to any database.\n")
     output.write("Type:  \\? for help with xsql commands\n")
     output.write("       \\q to quit\n")
+    output.flush()
 
 
 @resolve_options
@@ -312,6 +316,7 @@ def metacommand_pset(target, output=None):
             "xsql error: \\pset: unknown option: {}\n"
             .format(variable)
         )
+        sys.stderr.flush()
 
 
 def run_editor(text):
