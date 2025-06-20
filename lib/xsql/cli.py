@@ -202,11 +202,6 @@ def run(args):
 
                     sys.stdout.flush()
 
-                    if config.autocommit:
-                        conn.rollback()
-
-                        config.run_sets(conn)
-
         except EOFError:
             if not config.quiet:
                 sys.stdout.write("\\q\n")

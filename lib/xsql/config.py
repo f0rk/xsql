@@ -13,7 +13,7 @@ class Configuration:
     def __init__(
         self,
         output=None,
-        autocommit=True,
+        isolation_level="AUTOCOMMIT",
         null="<NÜLLZØR>",
         pager=None,
         syntax=False,
@@ -38,7 +38,7 @@ class Configuration:
 
         self.output = output
 
-        self.autocommit = autocommit
+        self.isolation_level = isolation_level
         self.null = null
 
         if pager is None:
@@ -97,9 +97,8 @@ class Configuration:
 
     def run_sets(self, conn):
         for set_ in self.sets:
-            conn.execute(text(set_).execution_options(autocommit=True))
-            if self.autocommit:
-                conn.execute(text("commit;"))
+            conn.execute(text(set_))
+            conn.execute(text("commit;"))
 
 
 def trim_quotes(value):
@@ -289,10 +288,9 @@ def process_config_line(conn, filename, line_number, line):
     else:
         config.sets.append(line)
         start_time = time.monotonic()
-        conn.execute(text(line).execution_options(autocommit=True))
+        conn.execute(text(line))
 
-        if config.autocommit:
-            conn.execute(text("commit;"))
+        conn.execute(text("commit;"))
 
         if not config.quiet:
             if re.search("^set", line, flags=re.I):

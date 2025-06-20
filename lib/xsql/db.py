@@ -1,5 +1,7 @@
 from sqlalchemy import create_engine
 
+from .config import config
+
 
 def make_engine(url):
 
@@ -15,6 +17,6 @@ def make_engine(url):
 
 def connect(args):
     engine = make_engine(args.url)
-    conn = engine.connect()
+    conn = engine.connect().execution_options(isolation_level=config.isolation_level)
 
     return conn
