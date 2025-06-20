@@ -20,12 +20,15 @@ def write(records, title=None, show_rowcount=False):
         and not config.format_ == "csv"
     )
 
-    if use_pager:
-        args = shlex.split(config.pager)
-        pager = subprocess.Popen(args, stdin=subprocess.PIPE, text=True)
-        output = pager.stdin
+    if config.output is not sys.stdout:
+        output = config.output
     else:
-        output = sys.stdout
+        if use_pager:
+            args = shlex.split(config.pager)
+            pager = subprocess.Popen(args, stdin=subprocess.PIPE, text=True)
+            output = pager.stdin
+        else:
+            output = config.output
 
     start_time = time.monotonic()
     total_time = 0
