@@ -23,6 +23,7 @@ class Configuration:
         quiet=False,
         extended_display=False,
         tuples_only=False,
+        format_="aligned",
         sets=None,
     ):
 
@@ -43,6 +44,7 @@ class Configuration:
         self.quiet = quiet
         self.extended_display = extended_display
         self.tuples_only = tuples_only
+        self.format_ = format_
 
         if sets is None:
             sets = []
@@ -92,7 +94,10 @@ def trim_quotes(value):
 
 
 def process_command_with_variable(command, line, default=None):
-    remainder = line[len(command):].strip()
+    if command is not None:
+        remainder = line[len(command):].strip()
+    else:
+        remainder = line
 
     res = re.split(r"\s+", remainder, maxsplit=1)
     variable = res[0]
@@ -133,6 +138,17 @@ def set_null_display(value):
 
     if not config.quiet:
         sys.stdout.write('Null display is "{}".\n'.format(value))
+
+
+def set_format(value):
+    if value not in ("aligned", "unaligned", "csv"):
+        sys.stderr.write("\pset: allowed formats are aligned, csv, unaligned\n")
+        return
+
+    config.format_ = value
+
+    if not config.quiet:
+        sys.stdout.write('Outupt format is "{}".\n'.format(value))
 
 
 def set_timing(value):
@@ -183,19 +199,11 @@ def process_config_line(conn, filename, line_number, line):
     from .run import run_metacommand
 
     if line.startswith("\\pset"):
-        variable, value = process_command_with_variable("\\pset", line)
-
-        if variable == "null":
-            set_null_display(value)
-        else:
-            sys.stderr.write(
-                "xsql:{}:{} error: \\pset: unknown option: {}\n"
-                .format(
-                    filename,
-                    line_number,
-                    variable,
-                )
-            )
+        run_metacommand(
+            None,
+            "pset",
+            get_remainder("\\pset", line),
+        )
     elif line.startswith("\\timing"):
         run_metacommand(
             None,
