@@ -85,7 +85,7 @@ def run_command(conn, command, title=None):
         if isinstance(command, str):
             if match := re.search(r"^\s*((create|drop)\s+(\w+))", command, flags=re.I):
                 status = match.groups()[0]
-            elif match := re.search(r"^\s*(insert|update|delete|truncate)\b", command, flags=re.I):
+            elif match := re.search(r"^\s*(insert|update|delete|truncate|analyze|vacuum)\b", command, flags=re.I):
                 status = match.groups()[0]
 
             command = text(command)
