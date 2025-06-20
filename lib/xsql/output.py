@@ -2,6 +2,7 @@ import csv
 import itertools
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -12,7 +13,7 @@ from .config import config
 from .time import write_time
 
 
-def write(records, title=None, show_rowcount=False):
+def write(records, title=None, show_rowcount=False, extra_content=None):
 
     pager = None
 
@@ -81,6 +82,9 @@ def write(records, title=None, show_rowcount=False):
             )
             write_title = False
             write_header = False
+
+    if extra_content is not None:
+        shutil.copyfileobj(extra_content, output)
 
     do_write_row_count = (
         show_rowcount
