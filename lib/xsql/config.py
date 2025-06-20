@@ -287,7 +287,7 @@ def process_config_line(conn, filename, line_number, line):
             pass
     else:
         config.sets.append(line)
-        start_time = time.monotonic()
+        start_time = time.monotonic_ns()
         conn.execute(text(line))
 
         conn.execute(text("commit;"))
@@ -298,7 +298,7 @@ def process_config_line(conn, filename, line_number, line):
             elif re.search("^select", line, flags=re.I):
                 sys.stdout.write("SELECT\n")
 
-        total_time = time.monotonic() - start_time
+        total_time = time.monotonic_ns() - start_time
         if config.timing:
             write_time(total_time)
 

@@ -170,11 +170,11 @@ def run(args):
             )
 
             if text.strip():
-                start_time = time.monotonic()
+                start_time = time.monotonic_ns()
                 try:
                     run_command(conn, text)
                 except sqlalchemy.exc.SQLAlchemyError as exc:
-                    total_time = time.monotonic() - start_time
+                    total_time = time.monotonic_ns() - start_time
                     is_postgres = False
                     if hasattr(exc, "orig") and hasattr(exc.orig, "pgerror"):
                         is_postgres = True

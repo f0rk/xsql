@@ -31,15 +31,15 @@ def write(records, title=None, show_rowcount=False):
         else:
             output = config.output
 
-    start_time = time.monotonic()
+    start_time = time.monotonic_ns()
     total_time = 0
     write_title = True
     write_header = not config.tuples_only
     total_rows = 0
     for batch in itertools.batched(records, 10000):
 
-        total_time += time.monotonic() - start_time
-        start_time = time.monotonic()
+        total_time += time.monotonic_ns() - start_time
+        start_time = time.monotonic_ns()
 
         if config.extended_display:
             total_rows += write_extended(
