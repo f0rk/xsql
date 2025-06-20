@@ -83,17 +83,12 @@ def run_command(conn, command, title=None):
         status = None
 
         if isinstance(command, str):
-            if match := re.search("^\s*((create|drop)\s+(\w+))", command, flags=re.I):
+            if match := re.search(r"^\s*((create|drop)\s+(\w+))", command, flags=re.I):
                 status = match.groups()[0]
-            elif match := re.search("^\s*(insert)", command, flags=re.I):
-                status = match.groups()[0]
-            elif match := re.search("^\s*(update)", command, flags=re.I):
+            elif match := re.search(r"^\s*(insert|update|delete|truncate)\b", command, flags=re.I):
                 status = match.groups()[0]
 
             command = text(command)
-
-        if config.autocommit:
-            conn.execute(text("begin;"))
 
         start_time = time.monotonic()
 
@@ -125,23 +120,17 @@ def run_command(conn, command, title=None):
 
             write_time(total_time)
 
-        if config.autocommit:
-            conn.execute(text("commit;"))
-
 
 def run_file(conn, file):
 
     with open(file, "rt") as fp:
         query = fp.read()
 
-    results = conn.execute(text(query).execution_options(autocommit=config.autocommit))
+    results = conn.execute(text(query))
     try:
         write(results)
     except BrokenPipeError:
         pass
-
-    if config.autocommit:
-        conn.execute(text("commit;"))
 
 
 def run_metacommand(conn, metacommand, rest):
