@@ -211,11 +211,11 @@ def write_unaligned(output, records, result, title=None, write_title=True, write
 
     if write_title and title is not None:
         output.write(title)
-        output.write("\n")
+        output.write(config.record_separator)
 
     if write_header:
-        output.write("|".join(fieldnames))
-        output.write("\n")
+        output.write(config.field_separator.join(fieldnames))
+        output.write(config.record_separator)
 
     row_count = 0
 
@@ -226,8 +226,8 @@ def write_unaligned(output, records, result, title=None, write_title=True, write
         record = raw._asdict()
 
         values = [as_str(record[f]) for f in fieldnames]
-        output.write("|".join(values))
-        output.write("\n")
+        output.write(config.field_separator.join(values))
+        output.write(config.record_separator)
 
     return row_count
 

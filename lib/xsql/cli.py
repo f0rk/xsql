@@ -77,6 +77,21 @@ def run(args):
     if args.csv:
         config.format_ = "csv"
 
+    if args.no_align:
+        config.format_ = "unaligned"
+
+    if args.expanded:
+        config.extended_display = args.expanded
+
+    if args.field_separator:
+        config.field_separator = args.field_separator
+
+    if args.field_separator_zero:
+        config.field_separator = "\0"
+
+    if args.record_separator_zero:
+        config.record_separator = "\0"
+
     if args.output:
         config.output = open(args.output, "wt")
 

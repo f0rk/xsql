@@ -25,6 +25,8 @@ class Configuration:
         extended_display=False,
         tuples_only=False,
         format_="aligned",
+        field_separator="|",
+        record_separator="\n",
         sets=None,
     ):
 
@@ -51,6 +53,8 @@ class Configuration:
         self.extended_display = extended_display
         self.tuples_only = tuples_only
         self.format_ = format_
+        self.field_separator = field_separator
+        self.record_separator = record_separator
 
         if sets is None:
             sets = []
