@@ -144,6 +144,7 @@ def set_null_display(value):
 
     if not config.quiet:
         sys.stdout.write('Null display is "{}".\n'.format(value))
+        sys.stdout.flush()
 
 
 def set_output(value):
@@ -159,12 +160,14 @@ def set_output(value):
 def set_format(value):
     if value not in ("aligned", "unaligned", "csv"):
         sys.stderr.write("\\pset: allowed formats are aligned, csv, unaligned\n")
+        sys.stderr.flush()
         return
 
     config.format_ = value
 
     if not config.quiet:
         sys.stdout.write('Outupt format is "{}".\n'.format(value))
+        sys.stdout.flush()
 
 
 def set_timing(value):
@@ -176,6 +179,7 @@ def set_timing(value):
 
     if not config.quiet:
         sys.stdout.write("Timing is {}.\n".format(display_value))
+        sys.stdout.flush()
 
 
 def set_extended_display(value):
@@ -187,6 +191,7 @@ def set_extended_display(value):
 
     if not config.quiet:
         sys.stdout.write("Extended display is {}.\n".format(display_value))
+        sys.stdout.flush()
 
 
 def set_tuples_only(value):
@@ -198,6 +203,7 @@ def set_tuples_only(value):
 
     if not config.quiet:
         sys.stdout.write("Tuples only is {}.\n".format(display_value))
+        sys.stdout.flush()
 
 
 def set_highlight(value):
@@ -209,6 +215,7 @@ def set_highlight(value):
 
     if not config.quiet:
         sys.stdout.write("Highlight is {}.\n".format(display_value))
+        sys.stdout.flush()
 
 
 def process_config_line(conn, filename, line_number, line):
@@ -268,6 +275,8 @@ def process_config_line(conn, filename, line_number, line):
         total_time = time.monotonic() - start_time
         if config.timing:
             sys.stdout.write("Time: {:.3f} ms\n".format(total_time * 1000))
+
+        sys.stdout.flush()
 
 
 config = Configuration()

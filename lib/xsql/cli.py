@@ -80,8 +80,12 @@ def run(args):
     if args.output:
         config.output = open(args.output, "wt")
 
-    if args.command:
-        run_command(conn, args.command, output=config.output, autocommit=True)
+    command = sys.stdin.read()
+    if not command:
+        command = args.command
+
+    if command:
+        run_command(conn, command, output=config.output, autocommit=True)
         clean_exit(conn)
     elif args.file:
         run_file(conn, args.file, output=config.output, autocommit=True)
@@ -90,6 +94,7 @@ def run(args):
     if not config.quiet:
         sys.stdout.write("xsql ({})\n".format(__version__))
         sys.stdout.write('Type "help" for help.\n\n')
+        sys.stdout.flush()
 
     prompt_args = {
         "vi_mode": True,
@@ -153,6 +158,8 @@ def run(args):
 
                     if config.timing:
                         sys.stdout.write("Time: {:.3} ms\n".format(total_time * 1000))
+
+                    sys.stdout.flush()
 
                     if config.autocommit:
                         conn.rollback()
