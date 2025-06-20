@@ -1,3 +1,4 @@
+import io
 import os
 import re
 import sys
@@ -62,7 +63,7 @@ def glob_to_like(v):
     return v.replace("*", "%")
 
 
-def run_command(conn, command, title=None):
+def run_command(conn, command, title=None, show_rowcount=True, extra_content=None):
 
     if isinstance(command, str) and is_maybe_metacommand(command):
         match = get_metacommand(command)
@@ -98,7 +99,12 @@ def run_command(conn, command, title=None):
 
         if results.returns_rows:
             try:
-                write(results, title=title, show_rowcount=True)
+                write(
+                    results,
+                    title=title,
+                    show_rowcount=show_rowcount,
+                    extra_content=extra_content,
+                )
             except BrokenPipeError:
                 pass
 
@@ -236,8 +242,32 @@ def metacommand_describe(conn, target):
     if not target:
         metacommand_describe_tables(conn, target)
     else:
+
+        filter_target = glob_to_like(target)
+
+        objects = []
+
         if conn.dialect.name == "sqlite":
-            query = """
+
+            object_query = """
+            select
+                't' as object_type,
+                null as object_schema,
+                sqlite_master.tbl_name as object_name
+            from
+                sqlite_master
+            where
+                sqlite_master.tbl_name like :filter_target
+            order by
+                sqlite_master.tbl_name
+            """
+
+            object_results = conn.execute(text(object_query).bindparams(filter_target=filter_target))
+
+            for object_result in object_results:
+                objects.append(object_result)
+
+            table_query = """
             select
                 info.name as "Column",
                 info."type" as "Type",
@@ -251,12 +281,37 @@ def metacommand_describe(conn, target):
                 sqlite_master,
                 pragma_table_info(sqlite_master.tbl_name) as info
             where
-                sqlite_master.tbl_name like :table_name
+                null is not distinct from :object_schema
+                and sqlite_master.tbl_name = :object_name
             order by
                 info.cid
             """
+
+            index_query = None
         else:
-            query = """
+
+            object_query = """
+            select
+                't' as object_type,
+                information_schema.tables.table_schema as object_schema,
+                information_schema.tables.table_name as object_name
+            from
+                information_schema.tables
+            where
+                :filter_target is null
+                or (information_schema.tables.table_schema || '.' || information_schema.tables.table_name) ilike :filter_target
+                or information_schema.tables.table_name ilike :filter_target
+            order by
+                information_schema.tables.table_schema,
+                information_schema.tables.table_name
+            """
+
+            object_results = conn.execute(text(object_query).bindparams(filter_target=filter_target))
+
+            for object_result in object_results:
+                objects.append(object_result)
+
+            table_query = """
             select
                 information_schema.columns.column_name as "Column",
                 information_schema.columns.data_type as "Type",
@@ -269,14 +324,147 @@ def metacommand_describe(conn, target):
             from
                 information_schema.columns
             where
-                information_schema.columns.table_name ilike :table_name
+                information_schema.columns.table_schema = :object_schema
+                and information_schema.columns.table_name = :object_name
             order by
                 information_schema.columns.ordinal_position
             """
 
-        query = text(query).bindparams(table_name=glob_to_like(target))
+            if conn.dialect.name == "postgresql":
 
-        run_command(conn, query)
+                conperiod = "false AS conperiod"
+                if conn.dialect.server_version_info[0] >= 18:
+                    conperiod = "pg_catalog.pg_constraint.conperiod"
+
+                index_query = """
+                select
+                    pg_catalog.pg_namespace.nspname,
+                    pg_catalog.pg_class.relname,
+                    index_class.relname as index_name,
+                    pg_catalog.pg_index.indisprimary,
+                    pg_catalog.pg_index.indisunique,
+                    pg_catalog.pg_index.indisclustered,
+                    pg_catalog.pg_index.indisvalid,
+                    pg_catalog.pg_get_indexdef(pg_catalog.pg_index.indexrelid, 0, true) as indexdef,
+                    pg_catalog.pg_get_constraintdef(pg_catalog.pg_constraint.oid, true) as constraintdef,
+                    pg_catalog.pg_index.indisreplident,
+                    pg_catalog.pg_constraint.contype,
+                    pg_catalog.pg_constraint.condeferrable,
+                    pg_catalog.pg_constraint.condeferred,
+                    {conperiod}
+                from
+                    pg_catalog.pg_class
+                join
+                    pg_catalog.pg_namespace
+                on
+                    pg_catalog.pg_class.relnamespace = pg_catalog.pg_namespace.oid
+                join
+                    pg_catalog.pg_index
+                on
+                    pg_catalog.pg_class.oid = pg_catalog.pg_index.indrelid
+                join
+                    pg_catalog.pg_class as index_class
+                on
+                    pg_catalog.pg_index.indexrelid = index_class.oid
+                left join
+                    pg_catalog.pg_constraint
+                on
+                    pg_catalog.pg_constraint.conrelid = pg_catalog.pg_index.indrelid
+                    and pg_catalog.pg_constraint.conindid = pg_catalog.pg_index.indexrelid
+                    and pg_catalog.pg_constraint.contype in ('p', 'u', 'x')
+                where
+                    pg_catalog.pg_namespace.nspname = :object_schema
+                    and pg_catalog.pg_class.relname = :object_name
+                order by
+                    pg_catalog.pg_index.indisprimary desc,
+                    pg_catalog.pg_class.relname
+                """.format(conperiod=conperiod)
+            else:
+                index_query = None
+
+        for object_result in objects:
+
+            title = None
+
+            if object_result.object_type == "t":
+                title = 'Table "{}"'.format(object_result.object_name)
+
+                if object_result.object_schema:
+                    title = 'Table "{}.{}"'.format(
+                        object_result.object_schema,
+                        object_result.object_name,
+                    )
+
+            params = {
+                "object_schema": object_result.object_schema,
+                "object_name": object_result.object_name,
+            }
+            query = text(table_query).bindparams(**params)
+
+            extra_content = None
+
+            if object_result.object_type == "t":
+                if index_query is not None:
+
+                    if extra_content is None:
+                        extra_content = io.StringIO()
+
+                    index_results = conn.execute(text(index_query).bindparams(**params))
+
+                    write_index_header = True
+
+                    for index_result in index_results:
+                        if write_index_header:
+                            extra_content.write("Indexes:\n")
+                            write_index_header = False
+
+                        extra_content.write('    "')
+                        extra_content.write(index_result.index_name)
+                        extra_content.write('" ')
+
+                        if index_result.contype == "x" or index_result.conperiod == "u":
+                            extra_content.write(index_result.constraintdef)
+                        else:
+
+                            index_type = ""
+                            if index_result.indisprimary:
+                                index_type = "PRIMARY KEY, "
+                            elif index_result.indisunique:
+                                if index_result.contype == "u":
+                                    index_type = "UNIQUE CONSTRAINT, "
+                                else:
+                                    index_type = "UNIQUE, "
+
+                            extra_content.write(index_type)
+
+                            _, index_definition = index_result.indexdef.split(" USING ")
+                            extra_content.write(index_definition)
+
+                            if index_result.condeferrable:
+                                extra_content.write(" DEFERRABLE")
+                            if index_result.condeferred:
+                                extra_content.write(" INITIALLY DEFERRED")
+
+                        if index_result.indisclustered:
+                            extra_content.write(" CLUSTER")
+                        if not index_result.indisvalid:
+                            extra_content.write(" INVALID")
+                        if index_result.indisreplident:
+                            extra_content.write(" REPLICA IDENTITY")
+
+                        extra_content.write("\n")
+
+            if extra_content is not None:
+                extra_content.seek(0)
+
+            run_command(
+                conn,
+                query,
+                title=title,
+                show_rowcount=False,
+                extra_content=extra_content,
+            )
+
 
 
 def metacommand_describe_tables(conn, target):
