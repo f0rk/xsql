@@ -67,7 +67,7 @@ def run_command(conn, command, title=None):
     if isinstance(command, str) and is_maybe_metacommand(command):
         match = get_metacommand(command)
         if not match:
-            handle_invalid_command(command, sys.stderr)
+            handle_invalid_command(command)
             return
 
         metacommand, rest = match.groups()
@@ -199,7 +199,7 @@ def run_metacommand(conn, metacommand, rest):
     elif metacommand == "pset":
         metacommand_pset(rest)
     else:
-        handle_invalid_command(metacommand, sys.stderr)
+        handle_invalid_command(metacommand)
 
 
 def handle_invalid_command(command):
@@ -236,23 +236,43 @@ def metacommand_describe(conn, target):
     if not target:
         metacommand_describe_tables(conn, target)
     else:
-        query = """
-        select
-            information_schema.columns.column_name as "Column",
-            information_schema.columns.data_type as "Type",
-            coalesce(information_schema.columns.collation_name, '') as "Collation",
-            case
-                when information_schema.columns.is_nullable = 'NO' then 'not null'
-                else ''
-            end as "Nullable",
-            coalesce(information_schema.columns.column_default, '') as "Default"
-        from
-            information_schema.columns
-        where
-            information_schema.columns.table_name ilike :table_name
-        order by
-            information_schema.columns.ordinal_position
-        """
+        if conn.dialect.name == "sqlite":
+            query = """
+            select
+                info.name as "Column",
+                info."type" as "Type",
+                '' as "Collation",
+                case
+                    when info."notnull" is distinct from 0 then 'not null'
+                    else ''
+                end as "Nullable",
+                info.dflt_value as "Default"
+            from
+                sqlite_master,
+                pragma_table_info(sqlite_master.tbl_name) as info
+            where
+                sqlite_master.tbl_name like :table_name
+            order by
+                info.cid
+            """
+        else:
+            query = """
+            select
+                information_schema.columns.column_name as "Column",
+                information_schema.columns.data_type as "Type",
+                coalesce(information_schema.columns.collation_name, '') as "Collation",
+                case
+                    when information_schema.columns.is_nullable = 'NO' then 'not null'
+                    else ''
+                end as "Nullable",
+                coalesce(information_schema.columns.column_default, '') as "Default"
+            from
+                information_schema.columns
+            where
+                information_schema.columns.table_name ilike :table_name
+            order by
+                information_schema.columns.ordinal_position
+            """
 
         query = text(query).bindparams(table_name=glob_to_like(target))
 
@@ -260,31 +280,49 @@ def metacommand_describe(conn, target):
 
 
 def metacommand_describe_tables(conn, target):
-    query = """
-    select
-        information_schema.tables.table_schema as "Schema",
-        information_schema.tables.table_name as "Name",
-        case
-            when information_schema.tables.table_type = 'BASE TABLE' then 'table'
-            when information_schema.tables.table_type = 'VIEW' then 'view'
-            else 'other'
-        end as "Type",
-        null::text as "Owner"
-    from
-        information_schema.tables
-    where
-        :target is null
-        or (information_schema.tables.table_schema || '.' || information_schema.tables.table_name) ilike :target
-        or information_schema.tables.table_name ilike :target
-    order by
-        information_schema.tables.table_schema,
-        information_schema.tables.table_name
-    """
 
     if not target:
         target = None
 
     target = glob_to_like(target)
+
+    if conn.dialect.name == "sqlite":
+        query = """
+        select
+            'sqlite' as "Schema",
+            tbl_name as "Name",
+            "type" as "Type",
+            null as "Owner"
+        from
+            sqlite_master
+        where
+            :target is null
+            or ('sqlite.' || tbl_name) like :target
+            or tbl_name like :target
+        order by
+            tbl_name
+        """
+    else:
+        query = """
+        select
+            information_schema.tables.table_schema as "Schema",
+            information_schema.tables.table_name as "Name",
+            case
+                when information_schema.tables.table_type = 'BASE TABLE' then 'table'
+                when information_schema.tables.table_type = 'VIEW' then 'view'
+                else 'other'
+            end as "Type",
+            null::text as "Owner"
+        from
+            information_schema.tables
+        where
+            :target is null
+            or (information_schema.tables.table_schema || '.' || information_schema.tables.table_name) ilike :target
+            or information_schema.tables.table_name ilike :target
+        order by
+            information_schema.tables.table_schema,
+            information_schema.tables.table_name
+        """
 
     query = text(query).bindparams(target=target)
 
