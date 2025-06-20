@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import time
 import tempfile
 
 from prompt_toolkit.buffer import Buffer
@@ -9,16 +10,20 @@ from sqlalchemy import text
 from .config import (
     config,
     process_command_with_variable,
+    set_color,
     set_extended_display,
     set_format,
     set_null_display,
     set_output,
+    set_syntax,
     set_timing,
     set_tuples_only,
 )
 from .exc import QuitException
 from .history import history
 from .output import write
+from .postgres import get_command_status
+from .time import write_time
 
 
 def get_metacommand(command):
@@ -88,14 +93,55 @@ def run_command(conn, command, output=None, autocommit=None, title=None):
             autocommit=autocommit,
         )
     else:
+
+        # XXX: really need to get cursor.statusmessage or pgresult_ptr to work
+        status = None
+
         if isinstance(command, str):
+            if match := re.search("^\s*((create|drop)\s+(\w+))", command, flags=re.I):
+                status = match.groups()[0]
+            elif match := re.search("^\s*(insert)", command, flags=re.I):
+                status = match.groups()[0]
+            elif match := re.search("^\s*(update)", command, flags=re.I):
+                status = match.groups()[0]
+
             command = text(command)
 
-        results = conn.execute(command.execution_options(autocommit=autocommit))
-        try:
-            write(results, title=title, show_rowcount=True)
-        except BrokenPipeError:
-            pass
+        if autocommit:
+            conn.execute(text("begin;"))
+
+        start_time = time.monotonic()
+
+        results = conn.execute(command)
+
+        total_time = time.monotonic() - start_time
+
+        if results.returns_rows:
+            try:
+                write(results, title=title, show_rowcount=True)
+            except BrokenPipeError:
+                pass
+
+        else:
+
+            if results.cursor is not None:
+                status = results.cursor.statusmessage
+
+                if not status:
+                    if conn.dialect.driver == "psycopg2":
+                        status = get_command_status(results.cursor)
+
+            if status:
+                config.output.write(status.upper())
+                if results.rowcount > -1:
+                    config.output.write(" ")
+                    config.output.write(str(results.rowcount))
+                config.output.write("\n")
+
+            write_time(total_time)
+
+        if autocommit:
+            conn.execute(text("commit;"))
 
 
 @resolve_options
@@ -109,6 +155,9 @@ def run_file(conn, file, output=None, autocommit=None):
         write(results)
     except BrokenPipeError:
         pass
+
+    if autocommit:
+        conn.execute(text("commit;"))
 
 
 @resolve_options
@@ -152,6 +201,8 @@ def run_metacommand(conn, metacommand, rest, output=None, autocommit=None):
             "x": "extended_display",
             "t": "tuples_only",
             "a": "format_",
+            "syntax": "syntax",
+            "color": "color",
         }[metacommand]
 
         set_function = {
@@ -159,6 +210,8 @@ def run_metacommand(conn, metacommand, rest, output=None, autocommit=None):
             "x": set_extended_display,
             "t": set_tuples_only,
             "a": set_format,
+            "syntax": set_syntax,
+            "color": set_color,
         }[metacommand]
 
         if not rest:

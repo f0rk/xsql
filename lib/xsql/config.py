@@ -5,6 +5,8 @@ import time
 
 from sqlalchemy import text
 
+from .time import write_time
+
 
 class Configuration:
 
@@ -14,7 +16,8 @@ class Configuration:
         autocommit=True,
         null="<NÜLLZØR>",
         pager=None,
-        highlight=False,
+        syntax=False,
+        color=False,
         history_size=500,
         verbosity=None,
         timing=False,
@@ -42,7 +45,8 @@ class Configuration:
             pager = os.environ.get("PAGER")
 
         self.pager = pager
-        self.highlight = highlight
+        self.syntax = syntax
+        self.color = color
         self.history_size = history_size
         self.verbosity = verbosity
         self.timing = timing
@@ -94,6 +98,8 @@ class Configuration:
     def run_sets(self, conn):
         for set_ in self.sets:
             conn.execute(text(set_).execution_options(autocommit=True))
+            if self.autocommit:
+                conn.execute(text("commit;"))
 
 
 def trim_quotes(value):
@@ -210,15 +216,27 @@ def set_tuples_only(value):
         sys.stdout.flush()
 
 
-def set_highlight(value):
-    config.highlight = value
+def set_syntax(value):
+    config.syntax = value
     if value:
         display_value = "on"
     else:
         display_value = "off"
 
     if not config.quiet:
-        sys.stdout.write("Highlight is {}.\n".format(display_value))
+        sys.stdout.write("Syntax is {}.\n".format(display_value))
+        sys.stdout.flush()
+
+
+def set_color(value):
+    config.color = value
+    if value:
+        display_value = "on"
+    else:
+        display_value = "off"
+
+    if not config.quiet:
+        sys.stdout.write("Color is {}.\n".format(display_value))
         sys.stdout.flush()
 
 
@@ -249,9 +267,12 @@ def process_config_line(conn, filename, line_number, line):
             "t",
             get_remainder("\\t", line),
         )
-    elif line == "\\highlight":
-        value = process_command_with_boolean("\\highlight", line, default=not config.highlight)
-        set_highlight(value)
+    elif line.startswith("\\syntax"):
+        value = process_command_with_boolean("\\syntax", line, default=not config.syntax)
+        set_syntax(value)
+    elif line.startswith("\\color"):
+        value = process_command_with_boolean("\\color", line, default=not config.color)
+        set_color(value)
     elif line.startswith("\\set"):
         variable, value = process_command_with_variable("\\set", line)
 
@@ -270,6 +291,9 @@ def process_config_line(conn, filename, line_number, line):
         start_time = time.monotonic()
         conn.execute(text(line).execution_options(autocommit=True))
 
+        if config.autocommit:
+            conn.execute(text("commit;"))
+
         if not config.quiet:
             if re.search("^set", line, flags=re.I):
                 sys.stdout.write("SET\n")
@@ -278,7 +302,7 @@ def process_config_line(conn, filename, line_number, line):
 
         total_time = time.monotonic() - start_time
         if config.timing:
-            sys.stdout.write("Time: {:.3f} ms\n".format(total_time * 1000))
+            write_time(total_time)
 
         sys.stdout.flush()
 
