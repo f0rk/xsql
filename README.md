@@ -74,7 +74,8 @@ xsql supports named connections, via the `~/.xsql/aliases` file.
 Enter each line as `<name>: <url>`, for example:
 ```
 ~$ cat ~/.xsql/aliases
-test: postgresql://postgres@/db
+local: postgresql://postgres@/db
+remote: arn:aws:ssm:us-east-1:666666666666:parameter/db/url
 ```
 
 You can then run:
@@ -82,6 +83,9 @@ You can then run:
 ~$ xsql test
 (postgres@[local]:5432 06:37:20) [db]>
 ```
+
+Note as well support for AWS SSM and Secrets Manager parameters, which will be
+resolved automatically. Comes with extra `aws`.
 
 Translation
 ===========
