@@ -54,3 +54,31 @@ def get_ssl_info(conn):
         return info
 
     return None
+
+
+def get_server_name(conn):
+    return conn.dialect.name
+
+
+def get_server_version(conn):
+
+    def as_str(version):
+        items = []
+        for v in version:
+            items.append(str(v))
+        return ".".join(items)
+
+    if conn.dialect.name in ("postgresql", "redshift"):
+        if not conn.dialect.server_version_info:
+            version_info = conn.dialect._get_server_version_info()
+        else:
+            version_info = conn.dialect.server_version_info
+
+        return as_str(version_info)
+
+    elif conn.dialect.name == "snowflake":
+        res = conn.execute(text("select current_version()")).fetchone()
+        return res[0]
+    else:
+        if conn.dialect.server_version_info:
+            return as_str(conn.dialect.server_version_info)
