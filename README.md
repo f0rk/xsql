@@ -17,7 +17,9 @@ Usage
 ~$
 ```
 
-See also `xsql --help`
+For interactive help and a list of available commands, use \?.
+
+See also `xsql --help`.
 
 Config
 ======
@@ -52,13 +54,13 @@ The above config results in:
 Null display is "<NÜLLZØR>".
 Timing is on.
 SET
-Time: 0.002 ms
+Time: 3.184 ms
 SET
-Time: 0.001 ms
+Time: 1.703 ms
 SET
-Time: 0.000 ms
+Time: 1.536 ms
 SET
-Time: 0.000 ms
+Time: 0.412 ms
 (postgres@[local]:5432 06:37:20) [db]> select
 > 1;
  ?column? 
@@ -66,4 +68,17 @@ Time: 0.000 ms
         1 
 Time: 0.130 ms
 (postgres@[local]:5432 06:37:25) [capitalrx_adjudication]>
+```
+
+xsql supports named connections, via the `~/.xsql/aliases` file.
+Enter each line as `<name>: <url>`, for example:
+```
+~$ cat ~/.xsql/aliases
+test: postgresql://postgres@/db
+```
+
+You can then run:
+```
+~$ xsql test
+(postgres@[local]:5432 06:37:20) [db]>
 ```

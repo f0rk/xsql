@@ -13,11 +13,23 @@ from prompt_toolkit.lexers import PygmentsLexer
 from pygments.lexers import sql
 
 from .config import config
-from .db import connect, get_server_name, get_server_version, get_ssl_info
+from .db import (
+    Reconnect,
+    connect,
+    display_ssl_info,
+    get_server_name,
+    get_server_version,
+    resolve_url,
+)
 from .exc import QuitException, PGError
 from .history import history
 from .prompt import render_prompt
-from .run import is_maybe_metacommand, run_command, run_file
+from .run import (
+    is_maybe_metacommand,
+    metacommand_conninfo,
+    run_command,
+    run_file,
+)
 from .time import write_time
 from .version import __version__
 
@@ -65,7 +77,45 @@ def run(args):
         sys.stdout.write("xsql {}\n".format(__version__))
         sys.exit(0)
 
-    conn = connect(args)
+    is_url, url = resolve_url(args.url)
+
+    if url is None:
+        if is_url:
+            # XXX: unreachable?
+            sys.stdout.write(
+                'xsql: error: connection to server failed: FATAL:  url "{}" is not valid\n'
+                .format(args.url)
+            )
+        else:
+            sys.stdout.write(
+                'xsql: error: connection to server failed: FATAL:  alias "{}" does not exist\n'
+                .format(args.url)
+            )
+
+        sys.exit(2)
+
+    try:
+        conn = connect(url)
+    except (sqlalchemy.exc.SQLAlchemyError, PGError) as exc:
+        is_postgres = False
+        if hasattr(exc, "orig") and hasattr(exc.orig, "pgerror"):
+            is_postgres = True
+            pgexc = exc.orig
+        if hasattr(exc, "pgerror"):
+            is_postgres = True
+            pgexc = exc
+
+        sys.stdout.write("xsql: error: ")
+        if not is_postgres:
+            sys.stdout.write("connection to server failed: ")
+            sys.stdout.write(exc.orig.args[0])
+            if not exc.orig.args[0].endswith("\n"):
+                sys.stdout.write("\n")
+        else:
+            sys.stdout.write(pgexc.args[0])
+
+        sys.stdout.flush()
+        sys.exit(2)
 
     if args.quiet:
         config.quiet = args.quiet
@@ -141,16 +191,7 @@ def run(args):
 
         sys.stdout.write(")\n")
 
-        ssl_info = get_ssl_info(conn)
-        if ssl_info:
-
-            ssl_output = ["{}: {}".format(k, v) for k, v in ssl_info.items()]
-            ssl_output = " ".join(ssl_output)
-
-            sys.stdout.write(
-                "SSL connection ({})\n"
-                .format(ssl_output)
-            )
+        display_ssl_info(conn)
 
         sys.stdout.write('Type "help" for help.\n\n')
 
@@ -239,6 +280,48 @@ def run(args):
             clean_exit(conn)
         except KeyboardInterrupt:
             pass
+        except Reconnect as reconnect:
+
+            is_url, url = resolve_url(reconnect.target)
+
+            if url is None:
+                if is_url:
+                    # XXX: unreachable?
+                    sys.stdout.write(
+                        'connection to server failed: FATAL:  url "{}" is not valid\n'
+                        .format(reconnect.target)
+                    )
+                else:
+                    sys.stdout.write(
+                        'connection to server failed: FATAL:  alias "{}" does not exist\n'
+                        .format(reconnect.target)
+                    )
+
+                sys.stdout.write("Previous connection kept\n")
+                sys.stdout.flush()
+            else:
+                try:
+                    conn = connect(url)
+                    metacommand_conninfo(conn)
+                except (sqlalchemy.exc.SQLAlchemyError, PGError) as exc:
+                    is_postgres = False
+                    if hasattr(exc, "orig") and hasattr(exc.orig, "pgerror"):
+                        is_postgres = True
+                        pgexc = exc.orig
+                    if hasattr(exc, "pgerror"):
+                        is_postgres = True
+                        pgexc = exc
+
+                    if not is_postgres:
+                        sys.stdout.write("connection to server failed: ")
+                        sys.stdout.write(exc.orig.args[0])
+                        if not exc.orig.args[0].endswith("\n"):
+                            sys.stdout.write("\n")
+                    else:
+                        sys.stdout.write(pgexc.args[0])
+
+                    sys.stdout.write("Previous connection kept\n")
+                    sys.stdout.flush()
 
 
 def clean_exit(conn=None):

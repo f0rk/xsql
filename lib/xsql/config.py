@@ -31,6 +31,7 @@ class Configuration:
         field_separator="|",
         record_separator="\n",
         sets=None,
+        variables=None,
     ):
 
         if output is None:
@@ -64,6 +65,11 @@ class Configuration:
             sets = []
 
         self.sets = sets
+
+        if variables is None:
+            variables = {}
+
+        self.variables = variables
 
     def load(self, conn, filename=None):
 
@@ -148,6 +154,19 @@ def process_command_with_boolean(command, line, default=None):
     return value
 
 
+def set_set(variable, value):
+    if variable.lower() == "prompt1":
+        config.prompt1 = value
+    elif variable.lower() == "prompt2":
+        config.prompt2 = value
+    elif variable.lower() == "histsize":
+        config.history_size = int(value)
+    elif variable.lower() == "verbosity":
+        config.verbosity = value
+    else:
+        config.variables[variable] = value
+
+
 def set_null_display(value):
     config.null = value
 
@@ -215,6 +234,22 @@ def set_tuples_only(value):
         sys.stdout.flush()
 
 
+def set_field_separator(value):
+    config.field_separator = value
+
+    if not config.quiet:
+        sys.stdout.write('Field seprator is "{}".\n'.format(value))
+        sys.stdout.flush()
+
+
+def set_record_separator(value):
+    config.record_separator = value
+
+    if not config.quiet:
+        sys.stdout.write('Record seprator is "{}".\n'.format(value))
+        sys.stdout.flush()
+
+
 def set_syntax(value):
     config.syntax = value
     if value:
@@ -274,17 +309,7 @@ def process_config_line(conn, filename, line_number, line):
         set_color(value)
     elif line.startswith("\\set"):
         variable, value = process_command_with_variable("\\set", line)
-
-        if variable.lower() == "prompt1":
-            config.prompt1 = value
-        elif variable.lower() == "prompt2":
-            config.prompt2 = value
-        elif variable.lower() == "histsize":
-            config.history_size = int(value)
-        elif variable.lower() == "verbosity":
-            config.verbosity = value
-        else:
-            pass
+        set_set(variable, value)
     else:
         config.sets.append(line)
         start_time = time.monotonic_ns()
