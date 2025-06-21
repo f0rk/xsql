@@ -26,3 +26,31 @@ def connect(args):
         conn = conn.execution_options(isolation_level=config.isolation_level)
 
     return conn
+
+
+def get_ssl_info(conn):
+    if hasattr(conn.connection, "dbapi_connection"):
+        if hasattr(conn.connection.dbapi_connection, "info"):
+            ssl_in_use = getattr(conn.connection.dbapi_connection.info, "ssl_in_use")
+
+            if ssl_in_use:
+
+                info_obj = conn.connection.dbapi_connection.info
+
+                info = {
+                    "protocol": info_obj.ssl_attribute("protocol"),
+                    "cipher": info_obj.ssl_attribute("cipher"),
+                    "bits": info_obj.ssl_attribute("key_bits"),
+                    "compression": info_obj.ssl_attribute("compression"),
+                }
+
+                return info
+
+    if conn.dialect.name == "snowflake":
+        info = {
+            "ocsp mode": conn.connection.dbapi_connection._ocsp_mode().name,
+        }
+
+        return info
+
+    return None
