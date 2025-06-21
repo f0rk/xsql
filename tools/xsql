@@ -28,6 +28,7 @@ parser.add_argument("--record-separator-zero", "-0", action="store_true", help="
 parser.add_argument("--expanded", "-x", action="store_true", help="turn on expanded table output")
 parser.add_argument("--version", "-V", action="store_true", help="output version information, then exit")
 parser.add_argument("--translate", help="apply translation settings, colon separated postgresql:redshift")
+parser.add_argument("--set", "-v", action="append", help="set variables NAME=VALUE")
 
 
 args = parser.parse_args()

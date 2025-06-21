@@ -148,7 +148,7 @@ def run_file(conn, file):
     with open(file, "rt") as fp:
         query = fp.read()
 
-    query = translate(query)
+    query = translate(conn, query)
     if query is None:
         return
 

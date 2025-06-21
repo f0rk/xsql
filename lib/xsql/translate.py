@@ -38,4 +38,10 @@ def translate(conn, query, from_=None, to=None):
         sys.stdout.flush()
         return None
 
-    return mod.translate(from_, to, conn, query)
+    return mod.translate(
+        from_,
+        to,
+        conn,
+        query,
+        config.variables.get("translate_options"),
+    )
