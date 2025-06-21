@@ -67,7 +67,7 @@ Time: 0.412 ms
 ----------
         1 
 Time: 0.130 ms
-(postgres@[local]:5432 06:37:25) [capitalrx_adjudication]>
+(postgres@[local]:5432 06:37:25) [db]>
 ```
 
 xsql supports named connections, via the `~/.xsql/aliases` file.
@@ -94,7 +94,7 @@ For example:
 import re
 
 
-def translate(from_, to, conn, query):
+def translate(from_, to, conn, query, options):
     if from_ == "redshift" and to in ("postgresql", "snowflake"):
         return re.sub(r"\bsome_custom_func[(]", r"other_custom_func(, query)
     elif from_ == ("postgresql", "snowflake") and to == "redshift":
@@ -104,5 +104,14 @@ def translate(from_, to, conn, query):
 ```
 
 If you operate multiple different databases, this can allow you to run the same
-queries with automatic translation. You can add arbitrary comments, hints, use tools like
-sqlglot, etc.
+queries with automatic translation. You can add arbitrary comments, hints, use
+tools like sqlglot, etc.
+
+Set translation using the `\translate` metacommand, for example:
+```
+(postgres@[local]:5432 06:37:25) [db]> \translate postgresql snowflake
+Translate is from "postgresql to "snowflake".
+```
+
+Options is a string set by `\set translate_options format=true`. `options` to
+`def translate` will be passed as `"format=true"`.

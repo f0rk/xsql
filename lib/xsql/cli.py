@@ -152,6 +152,11 @@ def run(args):
         config.translate_from = from_
         config.translate_to = to
 
+    if args.set:
+        for entry in args.set:
+            name, value = entry.split("=")
+            config.variables[name] = value
+
     command = None
 
     if not sys.stdin.isatty():
