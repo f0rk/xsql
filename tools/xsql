@@ -3,7 +3,12 @@
 import argparse
 import sys
 
+import setproctitle
+
 from xsql import run
+
+
+setproctitle.setproctitle("xsql")
 
 
 parser = argparse.ArgumentParser()
