@@ -14,7 +14,7 @@ from pygments.lexers import sql
 
 from .config import config
 from .db import connect
-from .exc import QuitException
+from .exc import QuitException, PGError
 from .history import history
 from .prompt import render_prompt
 from .run import is_maybe_metacommand, run_command, run_file
@@ -173,11 +173,15 @@ def run(args):
                 start_time = time.monotonic_ns()
                 try:
                     run_command(conn, text)
-                except sqlalchemy.exc.SQLAlchemyError as exc:
+                except (sqlalchemy.exc.SQLAlchemyError, PGError) as exc:
                     total_time = time.monotonic_ns() - start_time
                     is_postgres = False
                     if hasattr(exc, "orig") and hasattr(exc.orig, "pgerror"):
                         is_postgres = True
+                        pgexc = exc.orig
+                    if hasattr(exc, "pgerror"):
+                        is_postgres = True
+                        pgexc = exc
 
                     if not is_postgres:
                         sys.stdout.write(exc.orig.args[0])
@@ -187,8 +191,8 @@ def run(args):
                         sys.stdout.write(
                             "ERROR:  {}: {}"
                             .format(
-                                exc.orig.pgcode,
-                                exc.orig.args[0],
+                                pgexc.pgcode,
+                                pgexc.args[0],
                             )
                         )
 
