@@ -27,6 +27,7 @@ parser.add_argument("--field-separator-zero", "-z", action="store_true", help="s
 parser.add_argument("--record-separator-zero", "-0", action="store_true", help="set record separator for unaligned output to zero byte")
 parser.add_argument("--expanded", "-x", action="store_true", help="turn on expanded table output")
 parser.add_argument("--version", "-V", action="store_true", help="output version information, then exit")
+parser.add_argument("--translate", help="apply translation settings, colon separated postgresql:redshift")
 
 
 args = parser.parse_args()

@@ -147,6 +147,11 @@ def run(args):
     if args.output:
         config.output = open(args.output, "wt")
 
+    if args.translate:
+        from_, to = args.translate.split(":")
+        config.translate_from = from_
+        config.translate_to = to
+
     command = None
 
     if not sys.stdin.isatty():
