@@ -15,7 +15,7 @@ from .formatters import list_to_array
 from .time import write_time
 
 
-def write(records, title=None, show_rowcount=False, extra_content=None):
+def write(records, title=None, show_rowcount=False, extra_content=None, total_time=0):
 
     pager = None
 
@@ -35,7 +35,6 @@ def write(records, title=None, show_rowcount=False, extra_content=None):
             output = config.output
 
     start_time = time.monotonic_ns()
-    total_time = 0
     write_title = True
     write_header = not config.tuples_only
     total_rows = 0

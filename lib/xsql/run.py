@@ -107,6 +107,7 @@ def run_command(conn, command, title=None, show_rowcount=True, extra_content=Non
                     title=title,
                     show_rowcount=show_rowcount,
                     extra_content=extra_content,
+                    total_time=total_time,
                 )
             except BrokenPipeError:
                 pass

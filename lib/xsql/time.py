@@ -3,7 +3,7 @@ from decimal import Decimal
 
 
 def write_time(total_time):
-    formatted_ms = "{:.3f}".format(Decimal(total_time) / Decimal("100000"))
+    formatted_ms = "{:.3f}".format(Decimal(total_time) / Decimal("1000000"))
 
     if "." in formatted_ms:
         left, right = formatted_ms.split(".")
