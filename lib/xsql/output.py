@@ -1,4 +1,5 @@
 import csv
+import json
 import itertools
 import re
 import shlex
@@ -135,6 +136,8 @@ def as_str(v):
         return list_to_array(v)
     if isinstance(v, bytes):
         return v.hex()
+    if isinstance(v, dict):
+        return json.dumps(v)
     return str(v)
 
 
