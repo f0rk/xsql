@@ -32,6 +32,8 @@ class Configuration:
         record_separator="\n",
         sets=None,
         variables=None,
+        translate_from=None,
+        translate_to=None,
     ):
 
         if output is None:
@@ -70,6 +72,9 @@ class Configuration:
             variables = {}
 
         self.variables = variables
+
+        self.translate_from = translate_from
+        self.translate_to = translate_to
 
     def load(self, conn, filename=None):
 
@@ -165,6 +170,22 @@ def set_set(variable, value):
         config.verbosity = value
     else:
         config.variables[variable] = value
+
+
+def set_translate(from_, to):
+    if from_ == "off":
+        config.translate_from = None
+        config.translate_to = None
+    else:
+        config.translate_from = from_
+        config.translate_to = to
+
+    if not config.quiet:
+        if config.translate_from is None:
+            sys.stdout.write("Translate is off.\n")
+        else:
+            sys.stdout.write('Translate is from "{} to "{}".\n'.format(from_, to))
+        sys.stdout.flush()
 
 
 def set_null_display(value):
@@ -288,6 +309,12 @@ def process_config_line(conn, filename, line_number, line):
             None,
             "timing",
             get_remainder("\\timing", line),
+        )
+    elif line.startswith("\\translate"):
+        run_metacommand(
+            None,
+            "translate",
+            get_remainder("\\translate", line),
         )
     elif line.startswith("\\x"):
         run_metacommand(

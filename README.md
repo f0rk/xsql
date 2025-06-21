@@ -82,3 +82,27 @@ You can then run:
 ~$ xsql test
 (postgres@[local]:5432 06:37:20) [db]>
 ```
+
+Translation
+===========
+
+xsql can translate queries user a user-defined function in `~/.xsql/tranlsate.py`.
+
+For example:
+```
+~$ cat ~/.xsql/translate.py
+import re
+
+
+def translate(from_, to, conn, query):
+    if from_ == "redshift" and to in ("postgresql", "snowflake"):
+        return re.sub(r"\bsome_custom_func[(]", r"other_custom_func(, query)
+    elif from_ == ("postgresql", "snowflake") and to == "redshift":
+        return re.sub(r"\bother_custom_func[(]", r"some_custom_func(", query)
+    else:
+        return query
+```
+
+If you operate multiple different databases, this can allow you to run the same
+queries with automatic translation. You can add arbitrary comments, hints, use tools like
+sqlglot, etc.

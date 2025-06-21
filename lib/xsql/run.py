@@ -24,6 +24,7 @@ from .config import (
     set_set,
     set_syntax,
     set_timing,
+    set_translate,
     set_tuples_only,
 )
 from .db import Reconnect, display_ssl_info
@@ -34,6 +35,7 @@ from .output import write, write_csv
 from .parsers import parse_copy
 from .postgres import get_command_status
 from .time import write_time
+from .translate import translate
 
 
 def get_metacommand(command):
@@ -89,6 +91,10 @@ def run_command(conn, command, title=None, show_rowcount=True, extra_content=Non
         )
     else:
 
+        command = translate(conn, command)
+        if command is None:
+            return
+
         # XXX: really need to get cursor.statusmessage or pgresult_ptr to work
         status = None
 
@@ -141,6 +147,10 @@ def run_file(conn, file):
 
     with open(file, "rt") as fp:
         query = fp.read()
+
+    query = translate(query)
+    if query is None:
+        return
 
     results = conn.execute(text(query))
     try:
@@ -204,12 +214,16 @@ def build_native_copy(query, options):
 
     statement += ")"
 
-    print(statement)
-
     return statement
 
 
 def run_copy(conn, command):
+
+    command = "copy " + command
+
+    command = translate(conn, command)
+    if command is None:
+        return
 
     try:
         query, options = parse_copy("copy " + command)
@@ -500,6 +514,8 @@ def run_metacommand(conn, metacommand, rest):
         metacommand_unset(rest)
     elif metacommand == "pset":
         metacommand_pset(rest)
+    elif metacommand == "translate":
+        metacommand_translate(rest)
     else:
         handle_invalid_command(metacommand)
 
@@ -537,6 +553,7 @@ def metacommand_help():
 
     sys.stdout.write("Query Buffer\n")
     sys.stdout.write("  \\e [FILE]              edit the query buffer (or file) with external editor\n")
+    sys.stdout.write("  \\translate [FROM] [TO] invoke translation function with query\n")
     sys.stdout.write("\n")
 
     sys.stdout.write("Input/Output\n")
@@ -916,6 +933,24 @@ def metacommand_pset(target):
             .format(variable)
         )
         sys.stderr.flush()
+
+
+def metacommand_translate(target):
+    if not strip(target):
+        if config.translate_from is None:
+            sys.stdout.write("Translate is off.\n")
+        else:
+            sys.stdout.write(
+                'Translate is from "{} to "{}".\n'
+                .format(
+                    config.translate_from,
+                    config.translate_to,
+                )
+            )
+        sys.stdout.flush()
+    else:
+        from_, to = process_command_with_variable(None, target)
+        set_translate(from_, to)
 
 
 def run_editor(text):
