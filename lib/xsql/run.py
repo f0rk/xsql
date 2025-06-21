@@ -5,6 +5,7 @@ import sys
 import time
 import tempfile
 
+import lark
 from prompt_toolkit.buffer import Buffer
 from sqlalchemy import text
 
@@ -151,26 +152,82 @@ def build_native_copy(query, options):
 
     statement += " with (format " + options.format_
 
+    if options.freeze is not None:
+        statement += ", freeze " + str(options.freeze).lower()
+
     if options.null:
-        statement += " null '" + options.null + "'"
+        statement += ", null '" + options.null + "'"
+
+    if options.default:
+        statement += ", default '" + options.default + "'"
 
     if options.header:
-        statement += " header"
+        statement += ", header"
 
     if options.quote:
-        statement += " quote '" + options.quote + "'"
+        statement += ", quote '" + options.quote + "'"
 
     if options.escape:
-        statement += " escape '" + options.escape + "'"
+        statement += ", escape '" + options.escape + "'"
+
+    if options.force_quote:
+        if "*" in options.force_quote:
+            force_quote_cols = "*"
+        else:
+            force_quote_cols = "(" + ", ".join(options.force_quote) + ")"
+        statement += ", force_quote " + force_quote_cols
+
+    if options.force_not_null:
+        statement += ", force_not_null (" + ", ".join(options.force_not_null) + ")"
+
+    if options.force_null:
+        statement += ", force_null (" + ", ".join(options.force_null) + ")"
+
+    if options.on_error:
+        statement += ", on_error " + options.on_error
+
+    if options.reject_limit:
+        statement += ", reject_limit " + options.reject_limit
+
+    if options.encoding:
+        statement += ", encoding '" + options.encoding + "'"
+
+    if options.log_verbosity:
+        statement += ", log_verbosity " + options.log_verbosity
 
     statement += ")"
+
+    print(statement)
 
     return statement
 
 
 def run_copy(conn, command):
 
-    query, options = parse_copy("copy " + command)
+    try:
+        query, options = parse_copy("copy " + command)
+    except lark.exceptions.UnexpectedCharacters as uex:
+        sys.stderr.write(
+            "ERROR:  unable to parse command at line {} col {} near {}\n"
+            .format(
+                uex.line,
+                uex.column,
+                uex.char,
+            )
+        )
+
+        uex_parts = str(uex).split("\n")
+
+        context = uex_parts[2]
+        arrow = uex_parts[3]
+
+        sys.stderr.write(context)
+        sys.stderr.write("\n")
+        sys.stderr.write(arrow)
+        sys.stderr.write("\n")
+        sys.stderr.flush()
+
+        return
 
     total_time = None
     total_rows = None
@@ -221,10 +278,25 @@ def run_copy(conn, command):
                 closable = open(options.target, "wt")
                 fp = closable
             elif options.target_type == "pipe":
-                if options.target == "stdout":
+                if options.target == "pstdout":
                     fp = sys.stdout
-                else:
+                elif options.target == "pstdin":
                     fp = sys.stdin
+                elif options.target == "stdout":
+                    fp = config.output
+                elif options.target == "stdin":
+                    fp = sys.stdin
+                else:
+                    sys.stderr.write(
+                        "copy {} {} is not implemented\n"
+                        .format(
+                            options.direction,
+                            options.target,
+                        )
+                    )
+                    sys.stderr.flush()
+                    return
+
             elif options.target_type == "program":
                 sys.stderr.write("copy program is not implemented\n")
                 sys.stderr.flush()
