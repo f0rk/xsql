@@ -13,7 +13,7 @@ from prompt_toolkit.lexers import PygmentsLexer
 from pygments.lexers import sql
 
 from .config import config
-from .db import connect
+from .db import connect, get_ssl_info
 from .exc import QuitException, PGError
 from .history import history
 from .prompt import render_prompt
@@ -128,7 +128,20 @@ def run(args):
 
     if not config.quiet:
         sys.stdout.write("xsql ({})\n".format(__version__))
+
+        ssl_info = get_ssl_info(conn)
+        if ssl_info:
+
+            ssl_output = ["{}: {}".format(k, v) for k, v in ssl_info.items()]
+            ssl_output = " ".join(ssl_output)
+
+            sys.stdout.write(
+                "SSL connection ({})\n"
+                .format(ssl_output)
+            )
+
         sys.stdout.write('Type "help" for help.\n\n')
+
         sys.stdout.flush()
 
     prompt_args = {
