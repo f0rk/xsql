@@ -1,6 +1,17 @@
-from sqlalchemy import create_engine, text
+import sys
 
+import sqlalchemy.exc
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine.url import make_url
+
+from .alias import load_aliases
 from .config import config
+
+
+class Reconnect(Exception):
+
+    def __init__(self, target):
+        self.target = target
 
 
 def make_engine(url):
@@ -15,8 +26,8 @@ def make_engine(url):
     return engine
 
 
-def connect(args):
-    engine = make_engine(args.url)
+def connect(url):
+    engine = make_engine(url)
     conn = engine.connect()
 
     if conn.dialect.name == "snowflake":
@@ -56,6 +67,20 @@ def get_ssl_info(conn):
     return None
 
 
+def display_ssl_info(conn):
+
+    ssl_info = get_ssl_info(conn)
+    if ssl_info:
+
+        ssl_output = ["{}: {}".format(k, v) for k, v in ssl_info.items()]
+        ssl_output = " ".join(ssl_output)
+
+        sys.stdout.write(
+            "SSL connection ({})\n"
+            .format(ssl_output)
+        )
+
+
 def get_server_name(conn):
     return conn.dialect.name
 
@@ -82,3 +107,24 @@ def get_server_version(conn):
     else:
         if conn.dialect.server_version_info:
             return as_str(conn.dialect.server_version_info)
+
+
+def resolve_url(target):
+    is_url = False
+    url = None
+    try:
+        make_url(target)
+        is_url = True
+        url = target
+    except sqlalchemy.exc.ArgumentError:
+        pass
+
+    # not a url, check aliases
+    if not is_url:
+
+        aliases = load_aliases()
+
+        if target in aliases:
+            url = aliases[target]
+
+    return is_url, url

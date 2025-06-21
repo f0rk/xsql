@@ -1,6 +1,8 @@
+import copy
 import io
 import os
 import re
+import subprocess
 import sys
 import time
 import tempfile
@@ -14,13 +16,17 @@ from .config import (
     process_command_with_variable,
     set_color,
     set_extended_display,
+    set_field_separator,
     set_format,
     set_null_display,
     set_output,
+    set_record_separator,
+    set_set,
     set_syntax,
     set_timing,
     set_tuples_only,
 )
+from .db import Reconnect, display_ssl_info
 from .exc import QuitException
 from .formatters import CopyWriter
 from .history import history
@@ -39,7 +45,7 @@ def get_metacommand(command):
         command = "\\??"
 
     if is_maybe_metacommand(command):
-        match = re.search(r"^\s*\\([a-z?+]+)(?:\s+(.+))?$", command)
+        match = re.search(r"^\s*\\([a-z?+!]+)(?:\s+(.+))?$", command)
         return match
 
     return False
@@ -358,6 +364,49 @@ def run_copy(conn, command):
             write_time(total_time)
 
 
+def metacommand_connect(target):
+    raise Reconnect(target)
+
+
+def metacommand_conninfo(conn, now=""):
+
+    sys.stdout.write("You are {}connected".format(now))
+
+    url = conn.engine.url
+
+    if url.database:
+        sys.stdout.write(' to database "{}"'.format(url.database))
+    if url.username:
+        sys.stdout.write(' as user "{}"'.format(url.username))
+
+    if url.host:
+        sys.stdout.write(' on host "{}"'.format(url.host))
+    else:
+        if conn.dialect.name == "postgresql":
+            res = conn.execute(text("show unix_socket_directories")).fetchone()
+            sys.stdout.write(' via socket in "{}"'.format(res[0]))
+
+    if url.port:
+        sys.stdout.write(' at port "{}"'.format(url.port))
+    else:
+        if conn.dialect.name in ("postgresql", "redshift"):
+
+            port = conn.connection.dbapi_connection.get_dsn_parameters().get("port")
+            if not port:
+                port = 5432
+
+            sys.stdout.write(' at port "{}"'.format(port))
+
+        elif conn.dialect.name == "snowflake":
+            sys.stdout.write(' at port "443"')
+
+    sys.stdout.write("\n")
+
+    display_ssl_info(conn)
+
+    sys.stdout.flush()
+
+
 def run_metacommand(conn, metacommand, rest):
     if metacommand == "i":
         run_file(conn, strip(rest))
@@ -365,6 +414,12 @@ def run_metacommand(conn, metacommand, rest):
         run_copy(conn, strip(rest))
     elif metacommand == "o":
         set_output(strip(rest))
+    elif metacommand == "f":
+        if not strip(rest):
+            sys.stdout.write('Field separator is "{}".\n'.format(config.field_separator))
+            sys.stdout.flush()
+        else:
+            set_field_separator(strip(rest))
     elif metacommand == "e":
         query = run_editor(rest)
         run_command(conn, query)
@@ -372,6 +427,22 @@ def run_metacommand(conn, metacommand, rest):
         metacommand_describe(conn, strip(rest))
     elif metacommand == "dt":
         metacommand_describe_tables(conn, strip(rest))
+    elif metacommand in ("c", "connect"):
+        metacommand_connect(strip(rest))
+    elif metacommand == "conninfo":
+        metacommand_conninfo(conn)
+    elif metacommand == "cd":
+        if strip(rest):
+            os.chdir(strip(rest))
+    elif metacommand == "setenv":
+        variable, value = process_command_with_variable(None, strip(rest))
+        if not value:
+            if variable in os.environ:
+                del os.environ[variable]
+        else:
+            os.environ[variable] = value
+    elif metacommand == "!":
+        run_shell(str(rest))
     elif metacommand == "?":
         metacommand_help()
     elif metacommand == "??":
@@ -423,6 +494,10 @@ def run_metacommand(conn, metacommand, rest):
                 return
 
         set_function(value)
+    elif metacommand == "set":
+        metacommand_set(rest)
+    elif metacommand == "unset":
+        metacommand_unset(rest)
     elif metacommand == "pset":
         metacommand_pset(rest)
     else:
@@ -447,12 +522,59 @@ def handle_invalid_command_value(command, value, expected=None):
 
 
 def metacommand_help():
+
+    current_timing = "off"
+    if config.timing:
+        current_timing = "on"
+
+    current_tuples_only = "off"
+    if config.tuples_only:
+        current_tuples_only = "on"
+
+    extended_display = "off"
+    if config.extended_display:
+        extended_display = "on"
+
+    sys.stdout.write("Query Buffer\n")
+    sys.stdout.write("  \\e [FILE]              edit the query buffer (or file) with external editor\n")
+    sys.stdout.write("\n")
+
     sys.stdout.write("Input/Output\n")
     sys.stdout.write("  \\copy ...              perform SQL COPY with data stream to the client host\n")
     sys.stdout.write("  \\i FILE                execute commands from file\n")
+    sys.stdout.write("  \\o [FILE]              send all query results to file or |pipe\n")
+    sys.stdout.write("\n")
+
     sys.stdout.write("Informational\n")
     sys.stdout.write("  \\d                     list tables and views\n")
     sys.stdout.write("  \\d      NAME           describe table or view\n")
+    sys.stdout.write("\n")
+
+    sys.stdout.write("Formatting\n")
+    sys.stdout.write("  \\a                     toggle between unaligned and aligned output mode\n")
+    sys.stdout.write("  \\f [STRING]            show or set field separator for unaligned query output\n")
+    sys.stdout.write("  \\pset [NAME [VALUE]]   set table output option\n")
+    sys.stdout.write("                         fieldsep_zero|format|null|recordsep_zero|tuples_only\n")
+    sys.stdout.write("  \\t [on|off]            show only rows (currently {})\n".format(current_tuples_only))
+    sys.stdout.write("  \\x [on|off]            toggle expanded output (currently {})\n".format(extended_display))
+    sys.stdout.write("\n")
+
+    sys.stdout.write("Connection\n")
+    sys.stdout.write("  \\c[onnect] {url | alias}\n")
+    sys.stdout.write("                         connect to new database\n")
+    sys.stdout.write("  \\conninfo              display information about current connection\n")
+    sys.stdout.write("\n")
+
+    sys.stdout.write("Operating System\n")
+    sys.stdout.write("  \\cd [DIR]              change the current working directory\n")
+    sys.stdout.write("  \\setenv NAME [VALUE]   set or unset environment variable\n")
+    sys.stdout.write("  \\timing [on|off]       toggle timing of commands (currently {})\n".format(current_timing))
+    sys.stdout.write("  \\! [COMMAND]           execute command in shell or start interactive shell\n")
+    sys.stdout.write("\n")
+
+    sys.stdout.write("Variables\n")
+    sys.stdout.write("  \\set [NAME [VALUE]]    set internal variable, or list all if no parameters\n")
+    sys.stdout.write("  \\unset NAME            unset (delete) internal variable\n")
     sys.stdout.flush()
 
 
@@ -742,6 +864,37 @@ def metacommand_describe_tables(conn, target):
     run_command(conn, query, title="List of relations")
 
 
+def metacommand_set(target):
+
+    if not strip(target):
+        values = copy.deepcopy(config.variables)
+        values["prompt1"] = config.prompt1
+        values["prompt2"] = config.prompt2
+        values["histsize"] = config.history_size
+        values["verbosity"] = config.verbosity
+        names = sorted(list(values.keys()))
+
+        for name in names:
+            value = values[name]
+            if value is None:
+                continue
+
+            if value is True:
+                value = "on"
+            elif value is False:
+                value = "off"
+
+            sys.stdout.write("{} = {!r}\n".format(name, value))
+    else:
+        variable, value = process_command_with_variable(None, target)
+        set_set(variable, value)
+
+
+def metacommand_unset(rest):
+    if strip(rest) in config.variables:
+        del config.variables[strip(rest)]
+
+
 def metacommand_pset(target):
     variable, value = process_command_with_variable(None, target)
 
@@ -749,6 +902,14 @@ def metacommand_pset(target):
         set_null_display(value)
     elif variable == "format":
         set_format(value)
+    elif variable == "tuples_only":
+        set_tuples_only(value)
+    elif variable == "fieldsep":
+        set_field_separator(value)
+    elif variable == "fieldsep_zero":
+        set_field_separator("\0")
+    elif variable == "recordsep_zero":
+        set_record_separator(value)
     else:
         sys.stderr.write(
             "xsql error: \\pset: unknown option: {}\n"
@@ -802,3 +963,8 @@ def run_editor(text):
             cleanup()
 
     return ""
+
+
+def run_shell(command):
+    process = subprocess.Popen(command, shell=True)
+    process.communicate()

@@ -12,7 +12,7 @@ setproctitle.setproctitle("xsql")
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("url", help="the url connection string", nargs="?")
+parser.add_argument("url", help="the url connection string or alias", nargs="?")
 parser.add_argument("--command", "-c", help="run only single command (SQL or internal) and exit")
 parser.add_argument("--file", "-f", help="execute commands from file, then exit")
 parser.add_argument("--output", "-o", help="send query results to file")
