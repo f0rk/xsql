@@ -6,6 +6,7 @@ authors = [{ name = "Ryan P. Kelly" }]
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "lark>=0.10.1",
     "prompt-toolkit>=3.0.51",
     "pygments>=2.15.1",
     "sqlalchemy>=0.9.2",

@@ -10,6 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from .config import config
+from .formatters import list_to_array
 from .time import write_time
 
 
@@ -298,11 +299,11 @@ def write_extended(output, records, result, total_rows, title=None, write_title=
     return row_count
 
 
-def write_csv(output, records, result, write_header=True):
+def write_csv(output, records, result, write_header=True, delimiter=","):
 
     fieldnames = list(result.keys())
 
-    writer = csv.writer(output)
+    writer = csv.writer(output, delimiter=delimiter)
     if write_header:
         writer.writerow(fieldnames)
 
@@ -314,21 +315,3 @@ def write_csv(output, records, result, write_header=True):
         writer.writerow([as_str(v) for v in raw])
 
     return row_count
-
-
-def format_array_entry(value):
-    if re.search("[a-zA-Z0-9_-]", value):
-        return value
-    return '"' + re.sub(r'"', '\\"', value) + '"'
-
-
-def convert_array_value(value):
-    if value is None:
-        return "NULL"
-
-    return format_array_entry(str(value))
-
-
-def list_to_array(values):
-    converted = [convert_array_value(v) for v in values]
-    return "{" + ",".join(converted) + "}"
