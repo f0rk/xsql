@@ -19,9 +19,12 @@ def write(records, title=None, show_rowcount=False, extra_content=None, total_ti
 
     pager = None
 
+    is_tty = sys.stdin.isatty()
+
     use_pager = (
         config.pager
         and not config.format_ == "csv"
+        and is_tty
     )
 
     if config.output is not sys.stdout:
