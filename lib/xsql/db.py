@@ -1,10 +1,10 @@
 import sys
 
-import sqlalchemy.exc
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine.url import make_url
 
 from .alias import load_aliases
+from .aws import resolve_arn
 from .config import config
 
 
@@ -110,13 +110,17 @@ def get_server_version(conn):
 
 
 def resolve_url(target):
+
+    if target and target.startswith("arn:"):
+        target = resolve_arn(target)
+
     is_url = False
     url = None
     try:
         make_url(target)
         is_url = True
         url = target
-    except sqlalchemy.exc.ArgumentError:
+    except Exception:
         pass
 
     # not a url, check aliases
@@ -126,5 +130,8 @@ def resolve_url(target):
 
         if target in aliases:
             url = aliases[target]
+
+    if url and url.startswith("arn:"):
+        url = resolve_arn(url)
 
     return is_url, url

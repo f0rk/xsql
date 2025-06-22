@@ -21,6 +21,9 @@ postgres = [
 snowflake = [
     "snowflake-sqlalchemy>=1.5.3",
 ]
+aws = [
+    "botocore>=1.34.51",
+]
 
 [build-system]
 requires = ["setuptools"]
