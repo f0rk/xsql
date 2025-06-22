@@ -226,7 +226,7 @@ def run_copy(conn, command):
         return
 
     try:
-        query, options = parse_copy("copy " + command)
+        query, options = parse_copy(command)
     except lark.exceptions.UnexpectedCharacters as uex:
         sys.stderr.write(
             "ERROR:  unable to parse command at line {} col {} near {}\n"
