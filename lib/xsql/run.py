@@ -1,4 +1,5 @@
 import copy
+import functools
 import io
 import os
 import re
@@ -463,7 +464,7 @@ def run_metacommand(conn, metacommand, rest):
         metacommand_help_main()
     elif metacommand == "q":
         raise QuitException()
-    elif metacommand in ("timing", "x", "t", "a"):
+    elif metacommand in ("timing", "x", "t", "a", "syntax", "color"):
 
         config_attr = {
             "timing": "timing",
@@ -479,7 +480,7 @@ def run_metacommand(conn, metacommand, rest):
             "x": set_extended_display,
             "t": set_tuples_only,
             "a": set_format,
-            "syntax": set_syntax,
+            "syntax": functools.partial(set_syntax, conn),
             "color": set_color,
         }[metacommand]
 
@@ -539,6 +540,14 @@ def handle_invalid_command_value(command, value, expected=None):
 
 def metacommand_help():
 
+    syntax_display = "off"
+    if config.syntax:
+        syntax_display = "on"
+
+    color_display = "off"
+    if config.color:
+        color_display = "on"
+
     current_timing = "off"
     if config.timing:
         current_timing = "on"
@@ -554,6 +563,8 @@ def metacommand_help():
     sys.stdout.write("Query Buffer\n")
     sys.stdout.write("  \\e [FILE]              edit the query buffer (or file) with external editor\n")
     sys.stdout.write("  \\translate [FROM] [TO] invoke translation function with query\n")
+    sys.stdout.write("  \\syntax [on|off]       turn syntax highlighting on or off (currently {})\n".format(syntax_display))
+    sys.stdout.write("  \\color [on|off]        turn color on or off (currently {})\n".format(color_display))
     sys.stdout.write("\n")
 
     sys.stdout.write("Input/Output\n")

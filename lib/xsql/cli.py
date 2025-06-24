@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 import sys
 import time
@@ -9,8 +8,7 @@ import sqlglot
 from prompt_toolkit import PromptSession
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
-from prompt_toolkit.lexers import PygmentsLexer
-from pygments.lexers import sql
+from prompt_toolkit.output.color_depth import ColorDepth
 
 from .config import config
 from .db import (
@@ -23,6 +21,7 @@ from .db import (
 )
 from .exc import QuitException, PGError
 from .history import history
+from .lexer import lexer
 from .prompt import render_prompt
 from .run import (
     is_maybe_metacommand,
@@ -212,27 +211,20 @@ def run(args):
         "enable_open_in_editor": True,
         "tempfile_suffix": ".sql",
         "key_bindings": bindings,
+        "lexer": lexer,
     }
-
-    if config.syntax:
-        lexer_class = sql.SqlLexer
-        if conn.dialect.name in ("postgresql", "redshift"):
-            lexer_class = sql.PostgresLexer
-        elif conn.dialect.name == "mysql":
-            lexer_class = sql.MySqlLexer
-
-        prompt_args["lexer"] = PygmentsLexer(lexer_class)
 
     if config.history_size:
         prompt_args["history"] = history
 
-    if config.color:
-        pass
-    else:
-        if not os.environ.get("PROMPT_TOOLKIT_COLOR_DEPTH"):
-            os.environ["PROMPT_TOOLKIT_COLOR_DEPTH"] = "DEPTH_1_BIT"
-
     session = PromptSession(**prompt_args)
+
+    def color_depth():
+        if config.color:
+            return ColorDepth.from_env()
+        else:
+            return ColorDepth.DEPTH_1_BIT
+    session.app._color_depth = color_depth
 
     while True:
         try:
