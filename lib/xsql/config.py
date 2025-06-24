@@ -197,14 +197,24 @@ def set_null_display(value):
 
 
 def set_output(value):
-    if config.output is not sys.stdout and config.output is not sys.stderr:
-        config.output.close()
-
     if not value:
+        if config.output is not sys.stdout and config.output is not sys.stderr:
+            config.output.close()
+
         config.output = sys.stdout
     else:
         if isinstance(value, str):
             value = os.path.expanduser(value)
+
+        if isinstance(value, str):
+            if not os.path.exists(value):
+                sys.stdout.write("{}: No such file or directory\n")
+                sys.stdout.flush()
+                return
+
+        if config.output is not sys.stdout and config.output is not sys.stderr:
+            config.output.close()
+
         config.output = open(value, "wt")
 
 
