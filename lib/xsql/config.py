@@ -271,12 +271,16 @@ def set_record_separator(value):
         sys.stdout.flush()
 
 
-def set_syntax(value):
+def set_syntax(conn, value):
+    from .lexer import lexer
+
     config.syntax = value
     if value:
         display_value = "on"
+        lexer.set_selected_by_name(conn.dialect.name)
     else:
         display_value = "off"
+        lexer.set_selected_by_name(None)
 
     if not config.quiet:
         sys.stdout.write("Syntax is {}.\n".format(display_value))
@@ -330,7 +334,7 @@ def process_config_line(conn, filename, line_number, line):
         )
     elif line.startswith("\\syntax"):
         value = process_command_with_boolean("\\syntax", line, default=not config.syntax)
-        set_syntax(value)
+        set_syntax(conn, value)
     elif line.startswith("\\color"):
         value = process_command_with_boolean("\\color", line, default=not config.color)
         set_color(value)

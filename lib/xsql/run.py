@@ -1,4 +1,5 @@
 import copy
+import functools
 import io
 import os
 import re
@@ -463,7 +464,7 @@ def run_metacommand(conn, metacommand, rest):
         metacommand_help_main()
     elif metacommand == "q":
         raise QuitException()
-    elif metacommand in ("timing", "x", "t", "a"):
+    elif metacommand in ("timing", "x", "t", "a", "syntax", "color"):
 
         config_attr = {
             "timing": "timing",
@@ -479,7 +480,7 @@ def run_metacommand(conn, metacommand, rest):
             "x": set_extended_display,
             "t": set_tuples_only,
             "a": set_format,
-            "syntax": set_syntax,
+            "syntax": functools.partial(set_syntax, conn),
             "color": set_color,
         }[metacommand]
 
