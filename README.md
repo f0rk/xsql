@@ -119,3 +119,8 @@ Translate is from "postgresql to "snowflake".
 
 Options is a string set by `\set translate_options format=true`. `options` to
 `def translate` will be passed as `"format=true"`.
+
+You can also use a script that takes arguments like:
+```
+~$ ~/.xsql/translate --options format=true auto redshift < /tmp/in.sql > /out.sql
+```
