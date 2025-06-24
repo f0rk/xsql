@@ -25,6 +25,9 @@ def translate(conn, query, from_=None, to=None):
     if from_ == to and (from_ != "auto" or to != "auto"):
         return query
 
+    if to == "auto":
+        to = conn.dialect.name
+
     translate_py = os.path.join(translate_dir, "translate.py")
     translate_script = os.path.join(translate_dir, "translate")
 
