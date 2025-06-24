@@ -100,7 +100,7 @@ import re
 
 def translate(from_, to, conn, query, options):
     if from_ == "redshift" and to in ("postgresql", "snowflake"):
-        return re.sub(r"\bsome_custom_func[(]", r"other_custom_func(, query)
+        return re.sub(r"\bsome_custom_func[(]", r"other_custom_func(", query)
     elif from_ == ("postgresql", "snowflake") and to == "redshift":
         return re.sub(r"\bother_custom_func[(]", r"some_custom_func(", query)
     else:
@@ -123,4 +123,42 @@ Options is a string set by `\set translate_options format=true`. `options` to
 You can also use a script that takes arguments like:
 ```
 ~$ ~/.xsql/translate --options format=true auto redshift < /tmp/in.sql > /out.sql
+```
+
+Note that using `auto` as the from or to dialect will result in the translate
+script always being called. You can use this, for example, when embedding a
+comment in the query indicating the dialect. Setting `\translate` as
+`\translate auto auto` will result in the translate function being called with
+`auto` as the from and the current dialect as the to. For example:
+```
+~$ cat ~/.xsql/translate.py
+import re
+
+
+def translate(from_, to, conn, query, options):
+
+    if from_ == "auto":
+        from_match = re.search(r"/[*]\s*dialect:\s*(\w+)\s*[*]/", query)
+        if from_match:
+            from_ = from_match.groups()[0]
+
+    if from_ == "redshift" and to in ("postgresql", "snowflake"):
+        return re.sub(r"\bsome_custom_func[(]", r"other_custom_func(", query)
+    elif from_ == ("postgresql", "snowflake") and to == "redshift":
+        return re.sub(r"\bother_custom_func[(]", r"some_custom_func(", query)
+    else:
+        return query
+
+~$ cat /tmp/a.sql
+/* dialect: redshift */
+select some_custom_func();
+~$ xsql postgresql://postgres@/db
+(postgres@[local]:5432 06:37:20) [db]> \translate auto auto
+(postgres@[local]:5432 06:38:04) [db]> \i /tmp/a.sql
+        other_custom_func
+----------------------------------
+ 2025-06-24T00:07:08.658407-04:00 
+(1 row)
+
+Time: 8.214 ms
 ```
