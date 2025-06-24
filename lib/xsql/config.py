@@ -203,6 +203,8 @@ def set_output(value):
     if not value:
         config.output = sys.stdout
     else:
+        if isinstance(value, str):
+            value = os.path.expanduser(value)
         config.output = open(value, "wt")
 
 
