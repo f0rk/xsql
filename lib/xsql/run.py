@@ -885,7 +885,6 @@ def metacommand_describe(conn, target):
             )
 
 
-
 def metacommand_describe_tables(conn, target):
 
     if not target:
