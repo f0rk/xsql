@@ -1,5 +1,60 @@
 import json
 import re
+from datetime import datetime
+from decimal import Decimal
+
+from .config import config
+
+
+def reformat_datetime(match):
+
+    microseconds = match.group(2)
+    microseconds = microseconds.rstrip("0")
+    if microseconds.endswith("."):
+        microseconds = microseconds.rstrip(".")
+
+    zone = match.group(3)
+    if zone:
+        if zone.endswith(":00"):
+            zone = zone[:-3]
+    else:
+        zone = ""
+
+    return match.group(1) + microseconds + zone
+
+
+def as_str(v):
+    if v is None:
+        return config.null
+    if isinstance(v, bool):
+        if v is True:
+            return "t"
+        elif v is False:
+            return "f"
+    if isinstance(v, datetime):
+        v = v.isoformat(sep=" ")
+
+        v = re.sub(
+            r"^([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2})([.][0-9]+)(([+-])([0-9]+:[0-9]+))?$",
+            reformat_datetime,
+            v,
+        )
+
+        return v
+    if isinstance(v, Decimal):
+        # see https://stackoverflow.com/questions/11093021/python-decimal-to-string
+        # for why str(obj) isn't just used
+        return "{0:f}".format(v)
+    if isinstance(v, set):
+        v = [*v]
+        return list_to_array(v)
+    if isinstance(v, list):
+        return list_to_array(v)
+    if isinstance(v, bytes):
+        return v.hex()
+    if isinstance(v, dict):
+        return json.dumps(v)
+    return str(v)
 
 
 def format_array_entry(value):
@@ -60,7 +115,7 @@ class CopyWriter:
                     else:
                         value = list_to_array(value)
                 else:
-                    value = str(value)
+                    value = as_str(value)
 
                 value = copy_data_escape(value)
 

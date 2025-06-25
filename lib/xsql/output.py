@@ -1,5 +1,4 @@
 import csv
-import json
 import itertools
 import re
 import shlex
@@ -7,11 +6,10 @@ import shutil
 import subprocess
 import sys
 import time
-from datetime import datetime
 from decimal import Decimal
 
 from .config import config
-from .formatters import list_to_array
+from .formatters import as_str
 from .time import write_time
 
 
@@ -115,32 +113,6 @@ def write(records, title=None, show_rowcount=False, extra_content=None, total_ti
 
     if do_write_timing:
         write_time(total_time)
-
-
-def as_str(v):
-    if v is None:
-        return config.null
-    if isinstance(v, bool):
-        if v is True:
-            return "t"
-        elif v is False:
-            return "f"
-    if isinstance(v, datetime):
-        return v.isoformat()
-    if isinstance(v, Decimal):
-        # see https://stackoverflow.com/questions/11093021/python-decimal-to-string
-        # for why str(obj) isn't just used
-        return "{0:f}".format(v)
-    if isinstance(v, set):
-        v = [*v]
-        return list_to_array(v)
-    if isinstance(v, list):
-        return list_to_array(v)
-    if isinstance(v, bytes):
-        return v.hex()
-    if isinstance(v, dict):
-        return json.dumps(v)
-    return str(v)
 
 
 def write_aligned(output, records, result, title=None, write_title=True, write_header=True):
