@@ -793,17 +793,65 @@ def metacommand_describe(conn, target):
 
             if conn.dialect.name == "postgresql":
                 if conn.dialect.server_version_info[0] >= 12:
+                    references_query = """
+                    select
+                        pg_catalog.pg_constraint.conrelid = (:object_schema || '.' || :object_name)::pg_catalog.regclass as sametable,
+                        pg_catalog.pg_constraint.conname as constraint_name,
+                        pg_catalog.pg_get_constraintdef(pg_catalog.pg_constraint.oid, true) as constraintdef,
+                        pg_catalog.pg_constraint.conrelid::pg_catalog.regclass as ontable
+                    from
+                        pg_catalog.pg_constraint
+                    left join (
+                        select
+                            *
+                        from
+                            pg_catalog.pg_partition_ancestors((:object_schema || '.' || :object_name)::pg_catalog.regclass)
+                    ) as ancestors
+                    on
+                        pg_catalog.pg_constraint.conrelid = ancestors.relid
+                    where
+                        pg_catalog.pg_constraint.contype = 'f'
+                        and pg_catalog.pg_constraint.conparentid = 0
+                        and (
+                            pg_catalog.pg_constraint.conrelid = (:object_schema || '.' || :object_name)::pg_catalog.regclass
+                            or ancestors.relid = pg_catalog.pg_constraint.conrelid
+                        )
+                    order by
+                        sametable desc,
+                        pg_catalog.pg_constraint.conname
+                    """
+                else:
+                    references_query = """
+                    select
+                        pg_catalog.pg_constraint.conrelid = (:object_schema || '.' || :object_name)::pg_catalog.regclass as sametable,
+                        pg_catalog.pg_constraint.conname as constraint_name,
+                        pg_catalog.pg_get_constraintdef(pg_catalog.pg_constraint.oid, true) as constraintdef,
+                        pg_catalog.pg_constraint.conrelid::pg_catalog.regclass as ontable
+                    from
+                        pg_catalog.pg_constraint
+                    where
+                        pg_catalog.pg_constraint.contype = 'f'
+                        and pg_catalog.pg_constraint.conrelid = (:object_schema || '.' || :object_name)::pg_catalog.regclass
+                    order by
+                        sametable desc,
+                        pg_catalog.pg_constraint.conname
+                    """
+            else:
+                references_query = None
+
+            if conn.dialect.name == "postgresql":
+                if conn.dialect.server_version_info[0] >= 12:
                     foreign_key_query = """
                     select
                         pg_catalog.pg_constraint.conname as constraint_name,
-                        conrelid::pg_catalog.regclass as ontable,
+                        pg_catalog.pg_constraint.conrelid::pg_catalog.regclass as ontable,
                         pg_catalog.pg_get_constraintdef(oid, true) as constraintdef
                     from
                         pg_catalog.pg_constraint
                     where
                         pg_catalog.pg_constraint.confrelid in (
                             select
-                                pg_catalog.pg_partition_ancestors((:object_schema || '.' || :object_name)::regclass)
+                                pg_catalog.pg_partition_ancestors((:object_schema || '.' || :object_name)::pg_catalog.regclass)
                             union all
                             values
                                 ((:object_schema || '.' || :object_name)::pg_catalog.regclass)
@@ -862,7 +910,7 @@ def metacommand_describe(conn, target):
                 from
                     pg_catalog.pg_trigger
                 where
-                    pg_catalog.pg_trigger.tgrelid = (:object_schema || '.' || :object_name)::regclass
+                    pg_catalog.pg_trigger.tgrelid = (:object_schema || '.' || :object_name)::pg_catalog.regclass
                 """.format(trigger_parent=trigger_parent)
 
                 if conn.dialect.server_version_info[0] >= 11 and conn.dialect.server_version_info[0] < 15:
@@ -990,6 +1038,31 @@ def metacommand_describe(conn, target):
                         extra_content.write(check_result.constraint_name)
                         extra_content.write('" ')
                         extra_content.write(check_result.constraintdef)
+                        extra_content.write("\n")
+
+                if references_query is not None:
+                    if extra_content is None:
+                        extra_content = io.StringIO()
+
+                    references_results = conn.execute(text(references_query).bindparams(**params))
+
+                    write_references_header = True
+
+                    for references_result in references_results:
+                        if write_references_header:
+                            extra_content.write("Foreign-key constraints:\n")
+                            write_references_header = False
+
+                        if not references_result.sametable:
+                            extra_content.write('    TABLE "')
+                            extra_content.write(references_result.ontable)
+                            extra_content.write('" CONSTRAINT "')
+                        else:
+                            extra_content.write('    "')
+
+                        extra_content.write(references_result.constraint_name)
+                        extra_content.write('" ')
+                        extra_content.write(references_result.constraintdef)
                         extra_content.write("\n")
 
                 if foreign_key_query is not None:
