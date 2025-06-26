@@ -761,7 +761,7 @@ def metacommand_describe(conn, target):
                     and pg_catalog.pg_class.relname = :object_name
                 order by
                     pg_catalog.pg_index.indisprimary desc,
-                    pg_catalog.pg_class.relname
+                    index_class.relname
                 """.format(conperiod=conperiod)
             else:
                 index_query = None
@@ -790,6 +790,116 @@ def metacommand_describe(conn, target):
                 """
             else:
                 check_query = None
+
+            if conn.dialect.name == "postgresql":
+                if conn.dialect.server_version_info[0] >= 12:
+                    foreign_key_query = """
+                    select
+                        pg_catalog.pg_constraint.conname as constraint_name,
+                        conrelid::pg_catalog.regclass as ontable,
+                        pg_catalog.pg_get_constraintdef(oid, true) as constraintdef
+                    from
+                        pg_catalog.pg_constraint
+                    where
+                        pg_catalog.pg_constraint.confrelid in (
+                            select
+                                pg_catalog.pg_partition_ancestors((:object_schema || '.' || :object_name)::regclass)
+                            union all
+                            values
+                                ((:object_schema || '.' || :object_name)::pg_catalog.regclass)
+                        )
+                        and pg_catalog.pg_constraint.contype = 'f'
+                        and pg_catalog.pg_constraint.conparentid = 0
+                    order by
+                        pg_catalog.pg_constraint.conname
+                    """
+                else:
+                    foreign_key_query = """
+                    select
+                        conname as constraint_name,
+                        conrelid::pg_catalog.regclass as ontable,
+                        pg_catalog.pg_get_constraintdef(oid, true) as constraintdef
+                    from
+                        pg_catalog.pg_constraint
+                    where
+                        pg_catalog.pg_constraint.confrelid = (:object_schema || '.' || :object_name)::pg_catalog.regclass
+                        and pg_catalog.pg_constraint.contype = 'f'
+                    order by
+                        pg_catalog.pg_constraint.conname
+                    """
+            else:
+                foreign_key_query = None
+
+            if conn.dialect.name == "postgresql":
+
+                trigger_parent = "null as parent"
+                if conn.dialect.server_version_info[0] >= 13:
+                    trigger_parent = """
+                    case when pg_catalog.pg_trigger.tgparentid != 0 then (
+                        select
+                            pg_catalog.pg_trigger.tgrelid::pg_catalog.regclass
+                        from
+                            pg_catalog.pg_trigger,
+                            pg_catalog.pg_partition_ancestors(pg_catalog.pg_trigger.tgrelid) with ordinality as ancestors (relid, depth)
+                        where
+                            pg_catalog.pg_trigger.tgname = pg_catalog.pg_trigger.tgname
+                            and pg_catalog.pg_trigger.tgrelid = ancestors.relid
+                            and pg_catalog.pg_trigger.tgparentid = 0
+                        order by
+                            ancestors.depth
+                        limit
+                            1
+                    ) end as parent
+                    """
+
+                trigger_query = """
+                select
+                    pg_catalog.pg_trigger.tgname as trigger_name,
+                    pg_catalog.pg_get_triggerdef(pg_catalog.pg_trigger.oid, true) as triggerdef,
+                    pg_catalog.pg_trigger.tgenabled,
+                    pg_catalog.pg_trigger.tgisinternal,
+                    {trigger_parent}
+                from
+                    pg_catalog.pg_trigger
+                where
+                    pg_catalog.pg_trigger.tgrelid = (:object_schema || '.' || :object_name)::regclass
+                """.format(trigger_parent=trigger_parent)
+
+                if conn.dialect.server_version_info[0] >= 11 and conn.dialect.server_version_info[0] < 15:
+                    trigger_query += """
+                    and (
+                        not pg_catalog.pg_trigger.tgisinternal
+                        or (
+                            pg_catalog.pg_trigger.tgisinternal
+                            and pg_catalog.pg_trigger.tgenabled = 'D'
+                        )
+                        or exists (
+                            select
+                                1
+                            from
+                                pg_catalog.pg_depend
+                            where
+                                pg_catalog.pg_depend.objid = pg_catalog.pg_trigger.oid
+                                and pg_catalog.pg_depend.refclassid = 'pg_catalog.pg_trigger'::pg_catalog.regclass
+                        )
+                    )
+                    """
+                else:
+                    trigger_query += """
+                    and (
+                        not pg_catalog.pg_trigger.tgisinternal
+                        or (
+                            pg_catalog.pg_trigger.tgisinternal
+                            and pg_catalog.pg_trigger.tgenabled = 'D'
+                        )
+                    )
+                    """
+
+                trigger_query += """
+                order by 1;
+                """
+            else:
+                trigger_query = None
 
         for object_result in objects:
 
@@ -846,7 +956,7 @@ def metacommand_describe(conn, target):
 
                             extra_content.write(index_type)
 
-                            _, index_definition = index_result.indexdef.split(" USING ")
+                            _, index_definition = index_result.indexdef.split(" USING ", maxsplit=1)
                             extra_content.write(index_definition)
 
                             if index_result.condeferrable:
@@ -881,6 +991,80 @@ def metacommand_describe(conn, target):
                         extra_content.write('" ')
                         extra_content.write(check_result.constraintdef)
                         extra_content.write("\n")
+
+                if foreign_key_query is not None:
+                    if extra_content is None:
+                        extra_content = io.StringIO()
+
+                    foreign_key_results = conn.execute(text(foreign_key_query).bindparams(**params))
+
+                    write_foreign_key_header = True
+
+                    for foreign_key_result in foreign_key_results:
+                        if write_foreign_key_header:
+                            extra_content.write("Referenced by:\n")
+                            write_foreign_key_header = False
+
+                        extra_content.write('    TABLE "')
+                        extra_content.write(foreign_key_result.ontable)
+                        extra_content.write('" CONSTRAINT "')
+                        extra_content.write(foreign_key_result.constraint_name)
+                        extra_content.write('" ')
+                        extra_content.write(foreign_key_result.constraintdef)
+                        extra_content.write("\n")
+
+                if trigger_query is not None:
+
+                    if extra_content is None:
+                        extra_content = io.StringIO()
+
+                    trigger_results = conn.execute(text(trigger_query).bindparams(**params))
+
+                    sections = {
+                        "triggers": "Triggers",
+                        "disabled_user_triggers": "Disabled user triggers",
+                        "disabled_internal_triggers": "Disabled internal triggers",
+                        "triggers_firing_always": "Triggers firing always",
+                        "triggers_firing_replica_only": "Triggers firing on replica only",
+                    }
+
+                    write_header = {}
+
+                    for section_key, section_title in sections.items():
+                        for trigger_result in trigger_results:
+
+                            trigger_section = None
+                            if trigger_result.tgenabled == "O" or trigger_result.tgenabled is True:
+                                trigger_section = "triggers"
+                            elif not trigger_result.tgisinternal and (trigger_result.tgenabled == "D" or trigger_result.tgenabled is False):
+                                trigger_section = "disabled_user_triggers"
+                            elif trigger_result.tgisinternal and (trigger_result.tgenabled == "D" or trigger_result.tgenabled is False):
+                                trigger_section = "disabled_internal_triggers"
+                            elif trigger_result.tgenabled == "A":
+                                trigger_section = "triggers_firing_always"
+                            elif trigger_result.tgenabled == "R":
+                                trigger_section = "triggers_firing_replica_only"
+                            else:
+                                trigger_section = "triggers"  # XXX
+
+                            if trigger_section != section_key:
+                                continue
+
+                            if section_key not in write_header:
+                                extra_content.write(section_title)
+                                extra_content.write(":\n")
+                                write_header[section_key] = False
+
+                            extra_content.write('    ')
+
+                            _, trigger_definition = trigger_result.triggerdef.split(" TRIGGER ", maxsplit=1)
+                            extra_content.write(trigger_definition)
+
+                            if trigger_result.parent:
+                                extra_content.write(", ON TABLE ")
+                                extra_content.write(trigger_result.parent)
+
+                            extra_content.write("\n")
 
             if extra_content is not None:
                 extra_content.seek(0)
