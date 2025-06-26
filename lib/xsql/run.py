@@ -32,7 +32,7 @@ from .db import Reconnect, display_ssl_info
 from .exc import QuitException
 from .formatters import CopyWriter
 from .history import history
-from .output import write, write_csv
+from .output import get_pager, should_use_pager, write, write_csv
 from .parsers import parse_copy
 from .postgres import get_command_status
 from .time import write_time
@@ -560,50 +560,59 @@ def metacommand_help():
     if config.extended_display:
         extended_display = "on"
 
-    sys.stdout.write("Query Buffer\n")
-    sys.stdout.write("  \\e [FILE]              edit the query buffer (or file) with external editor\n")
-    sys.stdout.write("  \\translate [FROM] [TO] invoke translation function with query\n")
-    sys.stdout.write("  \\syntax [on|off]       turn syntax highlighting on or off (currently {})\n".format(syntax_display))
-    sys.stdout.write("  \\color [on|off]        turn color on or off (currently {})\n".format(color_display))
-    sys.stdout.write("\n")
+    pager = None
+    if should_use_pager():
+        pager, output = get_pager()
+    else:
+        output = sys.stdout
 
-    sys.stdout.write("Input/Output\n")
-    sys.stdout.write("  \\copy ...              perform SQL COPY with data stream to the client host\n")
-    sys.stdout.write("  \\i FILE                execute commands from file\n")
-    sys.stdout.write("  \\o [FILE]              send all query results to file or |pipe\n")
-    sys.stdout.write("\n")
+    output.write("Query Buffer\n")
+    output.write("  \\e [FILE]              edit the query buffer (or file) with external editor\n")
+    output.write("  \\translate [FROM] [TO] invoke translation function with query\n")
+    output.write("  \\syntax [on|off]       turn syntax highlighting on or off (currently {})\n".format(syntax_display))
+    output.write("  \\color [on|off]        turn color on or off (currently {})\n".format(color_display))
+    output.write("\n")
 
-    sys.stdout.write("Informational\n")
-    sys.stdout.write("  \\d                     list tables and views\n")
-    sys.stdout.write("  \\d      NAME           describe table or view\n")
-    sys.stdout.write("\n")
+    output.write("Input/Output\n")
+    output.write("  \\copy ...              perform SQL COPY with data stream to the client host\n")
+    output.write("  \\i FILE                execute commands from file\n")
+    output.write("  \\o [FILE]              send all query results to file or |pipe\n")
+    output.write("\n")
 
-    sys.stdout.write("Formatting\n")
-    sys.stdout.write("  \\a                     toggle between unaligned and aligned output mode\n")
-    sys.stdout.write("  \\f [STRING]            show or set field separator for unaligned query output\n")
-    sys.stdout.write("  \\pset [NAME [VALUE]]   set table output option\n")
-    sys.stdout.write("                         fieldsep_zero|format|null|recordsep_zero|tuples_only\n")
-    sys.stdout.write("  \\t [on|off]            show only rows (currently {})\n".format(current_tuples_only))
-    sys.stdout.write("  \\x [on|off]            toggle expanded output (currently {})\n".format(extended_display))
-    sys.stdout.write("\n")
+    output.write("Informational\n")
+    output.write("  \\d                     list tables and views\n")
+    output.write("  \\d      NAME           describe table or view\n")
+    output.write("\n")
 
-    sys.stdout.write("Connection\n")
-    sys.stdout.write("  \\c[onnect] {url | alias}\n")
-    sys.stdout.write("                         connect to new database\n")
-    sys.stdout.write("  \\conninfo              display information about current connection\n")
-    sys.stdout.write("\n")
+    output.write("Formatting\n")
+    output.write("  \\a                     toggle between unaligned and aligned output mode\n")
+    output.write("  \\f [STRING]            show or set field separator for unaligned query output\n")
+    output.write("  \\pset [NAME [VALUE]]   set table output option\n")
+    output.write("                         fieldsep_zero|format|null|recordsep_zero|tuples_only\n")
+    output.write("  \\t [on|off]            show only rows (currently {})\n".format(current_tuples_only))
+    output.write("  \\x [on|off]            toggle expanded output (currently {})\n".format(extended_display))
+    output.write("\n")
 
-    sys.stdout.write("Operating System\n")
-    sys.stdout.write("  \\cd [DIR]              change the current working directory\n")
-    sys.stdout.write("  \\setenv NAME [VALUE]   set or unset environment variable\n")
-    sys.stdout.write("  \\timing [on|off]       toggle timing of commands (currently {})\n".format(current_timing))
-    sys.stdout.write("  \\! [COMMAND]           execute command in shell or start interactive shell\n")
-    sys.stdout.write("\n")
+    output.write("Connection\n")
+    output.write("  \\c[onnect] {url | alias}\n")
+    output.write("                         connect to new database\n")
+    output.write("  \\conninfo              display information about current connection\n")
+    output.write("\n")
 
-    sys.stdout.write("Variables\n")
-    sys.stdout.write("  \\set [NAME [VALUE]]    set internal variable, or list all if no parameters\n")
-    sys.stdout.write("  \\unset NAME            unset (delete) internal variable\n")
-    sys.stdout.flush()
+    output.write("Operating System\n")
+    output.write("  \\cd [DIR]              change the current working directory\n")
+    output.write("  \\setenv NAME [VALUE]   set or unset environment variable\n")
+    output.write("  \\timing [on|off]       toggle timing of commands (currently {})\n".format(current_timing))
+    output.write("  \\! [COMMAND]           execute command in shell or start interactive shell\n")
+    output.write("\n")
+
+    output.write("Variables\n")
+    output.write("  \\set [NAME [VALUE]]    set internal variable, or list all if no parameters\n")
+    output.write("  \\unset NAME            unset (delete) internal variable\n")
+    output.flush()
+
+    if pager is not None:
+        pager.communicate()
 
 
 def metacommand_help_main():
