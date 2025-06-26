@@ -206,16 +206,22 @@ def set_output(value):
         if isinstance(value, str):
             value = os.path.expanduser(value)
 
+        new_output = None
         if isinstance(value, str):
-            if not os.path.exists(value):
-                sys.stdout.write("{}: No such file or directory\n")
+            try:
+                new_output = open(value, "wt")
+            except OSError:
+                sys.stdout.write("{}: No such file or directory\n".format(value))
                 sys.stdout.flush()
                 return
 
         if config.output is not sys.stdout and config.output is not sys.stderr:
             config.output.close()
 
-        config.output = open(value, "wt")
+        if new_output is None:
+            config.output = open(value, "wt")
+        else:
+            config.output = new_output
 
 
 def set_format(value):

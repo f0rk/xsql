@@ -13,9 +13,7 @@ from .formatters import as_str
 from .time import write_time
 
 
-def write(records, title=None, show_rowcount=False, extra_content=None, total_time=0):
-
-    pager = None
+def should_use_pager():
 
     is_tty = sys.stdin.isatty()
 
@@ -25,15 +23,35 @@ def write(records, title=None, show_rowcount=False, extra_content=None, total_ti
         and is_tty
     )
 
+    return use_pager
+
+
+def get_pager():
+    args = shlex.split(config.pager)
+    pager = subprocess.Popen(args, stdin=subprocess.PIPE, text=True)
+    output = pager.stdin
+
+    return pager, output
+
+
+def get_output():
+
+    pager = None
+
     if config.output is not sys.stdout:
         output = config.output
     else:
-        if use_pager:
-            args = shlex.split(config.pager)
-            pager = subprocess.Popen(args, stdin=subprocess.PIPE, text=True)
-            output = pager.stdin
+        if should_use_pager():
+            pager, output = get_pager()
         else:
             output = config.output
+
+    return pager, output
+
+
+def write(records, title=None, show_rowcount=False, extra_content=None, total_time=0):
+
+    pager, output = get_output()
 
     start_time = time.monotonic_ns()
     write_title = True
