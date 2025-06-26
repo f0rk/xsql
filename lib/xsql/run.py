@@ -757,6 +757,31 @@ def metacommand_describe(conn, target):
             else:
                 index_query = None
 
+            if conn.dialect.name == "postgresql":
+                check_query = """
+                select
+                    pg_catalog.pg_constraint.conname as constraint_name,
+                    pg_catalog.pg_get_constraintdef(pg_catalog.pg_constraint.oid, true) as constraintdef
+                from
+                    pg_catalog.pg_constraint
+                join
+                    pg_catalog.pg_class
+                on
+                    pg_catalog.pg_class.oid = pg_catalog.pg_constraint.conrelid
+                join
+                    pg_catalog.pg_namespace
+                on
+                    pg_catalog.pg_class.relnamespace = pg_catalog.pg_namespace.oid
+                where
+                    pg_catalog.pg_namespace.nspname = :object_schema
+                    and pg_catalog.pg_class.relname = :object_name
+                    and pg_catalog.pg_constraint.contype = 'c'
+                order by
+                    1
+                """
+            else:
+                check_query = None
+
         for object_result in objects:
 
             title = None
@@ -827,6 +852,25 @@ def metacommand_describe(conn, target):
                         if index_result.indisreplident:
                             extra_content.write(" REPLICA IDENTITY")
 
+                        extra_content.write("\n")
+
+                if check_query is not None:
+                    if extra_content is None:
+                        extra_content = io.StringIO()
+
+                    check_results = conn.execute(text(check_query).bindparams(**params))
+
+                    write_check_header = True
+
+                    for check_result in check_results:
+                        if write_check_header:
+                            extra_content.write("Check constraints:\n")
+                            write_check_header = False
+
+                        extra_content.write('    "')
+                        extra_content.write(check_result.constraint_name)
+                        extra_content.write('" ')
+                        extra_content.write(check_result.constraintdef)
                         extra_content.write("\n")
 
             if extra_content is not None:
