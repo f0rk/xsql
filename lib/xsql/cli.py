@@ -52,6 +52,10 @@ bindings = KeyBindings()
 @bindings.add(Keys.Enter)
 def _(event):
 
+    if not event.current_buffer.text.strip():
+        event.current_buffer.validate_and_handle()
+        return
+
     if is_maybe_metacommand(event.current_buffer.text):
         event.current_buffer.validate_and_handle()
         return
