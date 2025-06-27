@@ -6,7 +6,7 @@ except ImportError:
 
 try:
     from psycopg2.errors import QueryCanceled
-except:
+except ImportError:
     class QueryCanceled(Exception):
         pass
 
