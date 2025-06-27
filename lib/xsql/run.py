@@ -513,6 +513,8 @@ def run_metacommand(conn, metacommand, rest):
                         value = "auto"
                 elif rest == "off":
                     value = None
+                elif rest == "refresh":
+                    refresh_completions(conn)
                 else:
                     handle_invalid_command_value(
                         metacommand,
