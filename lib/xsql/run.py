@@ -12,7 +12,7 @@ import lark
 from prompt_toolkit.buffer import Buffer
 from sqlalchemy import text
 
-from .completion import refresh_completions
+from .completion import clear_completions, refresh_completions
 from .config import (
     config,
     process_command_with_variable,
@@ -150,6 +150,8 @@ def run_command(conn, command, title=None, show_rowcount=True, extra_content=Non
             if config.autocomplete:
                 if re.search("^(create|drop|alter)", status.lower()):
                     refresh_completions(conn)
+            else:
+                clear_completions()
 
 
 def run_file(conn, file):
