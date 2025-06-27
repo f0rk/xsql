@@ -581,6 +581,10 @@ def metacommand_help():
     if config.color:
         color_display = "on"
 
+    autocomplete_display = "off"
+    if config.autocomplete:
+        autocomplete_display = config.autocomplete
+
     current_timing = "off"
     if config.timing:
         current_timing = "on"
@@ -604,6 +608,8 @@ def metacommand_help():
     output.write("  \\translate [FROM] [TO] invoke translation function with query\n")
     output.write("  \\syntax [on|off]       turn syntax highlighting on or off (currently {})\n".format(syntax_display))
     output.write("  \\color [on|off]        turn color on or off (currently {})\n".format(color_display))
+    output.write("  \\autocomplete [on|off|auto|readline|column|multi_column|refresh]\n")
+    output.write("                         turn autocomplete on or off, or refresh the cache (currently {})\n".format(autocomplete_display))
     output.write("\n")
 
     output.write("Input/Output\n")
