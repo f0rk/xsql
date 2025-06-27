@@ -68,7 +68,7 @@ def refresh_completions(conn):
         """
     elif conn.dialect.name == "snowflake":
         if config.verbosity:
-            sys.stdout.write("refreshing completion cache\n")
+            sys.stdout.write("refreshing autocomplete cache\n")
             sys.stdout.flush()
 
         names_query = """
@@ -91,7 +91,7 @@ def refresh_completions(conn):
     else:
         if conn.dialect.name == "redshift":
             if config.verbosity:
-                sys.stdout.write("refreshing completion cache\n")
+                sys.stdout.write("refreshing autocomplete cache\n")
                 sys.stdout.flush()
 
         names_query = """
