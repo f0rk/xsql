@@ -18,6 +18,7 @@ class Configuration:
         pager=None,
         syntax=False,
         color=False,
+        autocomplete=None,
         history_size=500,
         verbosity=None,
         timing=False,
@@ -50,6 +51,7 @@ class Configuration:
         self.pager = pager
         self.syntax = syntax
         self.color = color
+        self.autocomplete = autocomplete
         self.history_size = history_size
         self.verbosity = verbosity
         self.timing = timing
@@ -317,10 +319,24 @@ def set_color(value):
         sys.stdout.flush()
 
 
+def set_autocomplete(value):
+    config.autocomplete = value
+    if value:
+        display_value = value
+    else:
+        display_value = "off"
+
+    if not config.quiet:
+        sys.stdout.write("Autocomplete is {}.\n".format(display_value))
+        sys.stdout.flush()
+
+
 def process_config_line(conn, filename, line_number, line):
     from .run import run_metacommand
 
-    if line.startswith("\\pset"):
+    if line.startswith("--"):
+        return
+    elif line.startswith("\\pset"):
         run_metacommand(
             None,
             "pset",
@@ -356,6 +372,13 @@ def process_config_line(conn, filename, line_number, line):
     elif line.startswith("\\color"):
         value = process_command_with_boolean("\\color", line, default=not config.color)
         set_color(value)
+    elif line.startswith("\\autocomplete"):
+        if config.autocomplete:
+            default = None
+        else:
+            default = "auto"
+        value = process_command_with_value("\\autocomplete", line, default=default)
+        set_autocomplete(value)
     elif line.startswith("\\set"):
         variable, value = process_command_with_variable("\\set", line)
         set_set(variable, value)

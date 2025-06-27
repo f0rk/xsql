@@ -12,9 +12,11 @@ import lark
 from prompt_toolkit.buffer import Buffer
 from sqlalchemy import text
 
+from .completion import refresh_completions
 from .config import (
     config,
     process_command_with_variable,
+    set_autocomplete,
     set_color,
     set_extended_display,
     set_field_separator,
@@ -142,6 +144,10 @@ def run_command(conn, command, title=None, show_rowcount=True, extra_content=Non
                 config.output.write("\n")
 
             write_time(total_time)
+
+            if config.autocomplete:
+                if re.search("^(create|drop|alter)", status.lower()):
+                    refresh_completions(conn)
 
 
 def run_file(conn, file):
@@ -464,7 +470,7 @@ def run_metacommand(conn, metacommand, rest):
         metacommand_help_main()
     elif metacommand == "q":
         raise QuitException()
-    elif metacommand in ("timing", "x", "t", "a", "syntax", "color"):
+    elif metacommand in ("timing", "x", "t", "a", "syntax", "color", "autocomplete"):
 
         config_attr = {
             "timing": "timing",
@@ -473,6 +479,7 @@ def run_metacommand(conn, metacommand, rest):
             "a": "format_",
             "syntax": "syntax",
             "color": "color",
+            "autocomplete": "autocomplete",
         }[metacommand]
 
         set_function = {
@@ -482,6 +489,7 @@ def run_metacommand(conn, metacommand, rest):
             "a": set_format,
             "syntax": functools.partial(set_syntax, conn),
             "color": set_color,
+            "autocomplete": set_autocomplete,
         }[metacommand]
 
         if not rest:
@@ -491,22 +499,41 @@ def run_metacommand(conn, metacommand, rest):
                     value = "aligned"
                 else:
                     value = "unaligned"
+            elif metacommand == "autocomplete":
+                value = None
             else:
                 value = not getattr(config, config_attr)
         else:
-            if rest in ("on", "true"):
-                value = True
-            elif rest in ("off", "false"):
-                value = False
+            if metacommand == "autocomplete":
+                if rest in ("readline", "column", "multi_column", "on", "auto"):
+                    value = rest
+                    if value == "on":
+                        value = "auto"
+                elif rest == "off":
+                    value = None
+                else:
+                    handle_invalid_command_value(
+                        metacommand,
+                        rest,
+                        expected="One of readline, column, multi_column, auto, on, or off expected",
+                        output=sys.stderr,
+                    )
+                    set_function(getattr(config, config_attr))
+                    return
             else:
-                handle_invalid_command_value(
-                    metacommand,
-                    rest,
-                    expected="Boolean expected",
-                    output=sys.stderr,
-                )
-                set_function(getattr(config, config_attr))
-                return
+                if rest in ("on", "true"):
+                    value = True
+                elif rest in ("off", "false"):
+                    value = False
+                else:
+                    handle_invalid_command_value(
+                        metacommand,
+                        rest,
+                        expected="Boolean expected",
+                        output=sys.stderr,
+                    )
+                    set_function(getattr(config, config_attr))
+                    return
 
         set_function(value)
     elif metacommand == "set":

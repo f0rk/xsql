@@ -10,6 +10,7 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
 from prompt_toolkit.output.color_depth import ColorDepth
 
+from .completion import completer, get_complete_style, refresh_completions
 from .config import config
 from .db import (
     Reconnect,
@@ -216,6 +217,15 @@ def run(args):
 
     if config.history_size:
         prompt_args["history"] = history
+
+    if config.autocomplete:
+        prompt_args["completer"] = completer
+
+        complete_style = get_complete_style()
+        if complete_style:
+            prompt_args["complete_style"] = complete_style
+
+        refresh_completions(conn)
 
     session = PromptSession(**prompt_args)
 
