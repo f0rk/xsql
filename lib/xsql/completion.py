@@ -63,8 +63,9 @@ def refresh_completions(conn):
             pragma_table_info(sqlite_master.tbl_name) as info
         """
     elif conn.dialect.name == "snowflake":
-        sys.stdout.write("refreshing completion cache\n")
-        sys.stdout.flush()
+        if config.verbosity:
+            sys.stdout.write("refreshing completion cache\n")
+            sys.stdout.flush()
 
         names_query = """
         select
@@ -85,8 +86,9 @@ def refresh_completions(conn):
         """
     else:
         if conn.dialect.name == "redshift":
-            sys.stdout.write("refreshing completion cache\n")
-            sys.stdout.flush()
+            if config.verbosity:
+                sys.stdout.write("refreshing completion cache\n")
+                sys.stdout.flush()
 
         names_query = """
         select
