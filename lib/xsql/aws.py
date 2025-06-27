@@ -1,3 +1,6 @@
+from sqlalchemy.engine.url import make_url
+
+
 def resolve_arn(arn):
     if arn.startswith("arn:aws:ssm:"):
         return resolve_ssm(arn)
@@ -66,3 +69,59 @@ def resolve_secretsmanager(arn):
     resp = secretsmanager_client.get_secret_value(SecretId=arn)
 
     return resp["SecretString"]
+
+
+def rds_auth(url):
+    import botocore.session
+
+    url = make_url(url)
+
+    host_parts = url.host.split(".")
+    cluster_region = host_parts[2]
+
+    bs = botocore.session.get_session()
+    rds_client = bs.create_client(
+        service_name="rds",
+        region_name=cluster_region,
+    )
+
+    password = rds_client.generate_db_auth_token(
+        DBHostname=url.host,
+        Port=url.port,
+        DBUsername=url.username,
+    )
+
+    url = url.set(password=password)
+    url = url.update_query_dict({"password": password})
+
+    return url.render_as_string(hide_password=False)
+
+
+def redshift_auth(url):
+    import botocore.session
+
+    url = make_url(url)
+
+    host_parts = url.host.split(".")
+    cluster_region = host_parts[2]
+    cluster_identifier = host_parts[0]
+
+    bs = botocore.session.get_session()
+    redshift_client = bs.create_client(
+        service_name="redshift",
+        region_name=cluster_region,
+    )
+
+    redshift_response = redshift_client.get_cluster_credentials(
+        DbUser=url.username,
+        DbName=url.database,
+        ClusterIdentifier=cluster_identifier,
+        AutoCreate=False,
+    )
+
+    url = url.set(username=redshift_response["DbUser"])
+    url = url.set(password=redshift_response["DbPassword"])
+
+    url = url.update_query_dict({"password": redshift_response["DbPassword"]})
+
+    return url.render_as_string(hide_password=False)
