@@ -11,6 +11,11 @@ from .config import config
 completion_cache = {}
 
 
+def maybe_refresh_completions(conn):
+    if not completion_cache:
+        refresh_completions(conn)
+
+
 def refresh_completions(conn):
 
     if conn.dialect.name == "postgresql":
@@ -965,6 +970,9 @@ sql_keywords = [
 
 def generator():
 
+    if not config.autocomplete:
+        return
+
     yielded = set()
 
     for sql_keyword in sql_keywords:
@@ -1002,16 +1010,13 @@ completer = DynamicCompleter(get_completer)
 
 
 def get_complete_style():
-    if not config.autocomplete:
-        return None
-
     if config.autocomplete == "readline":
         return CompleteStyle.READLINE_LIKE
     elif config.autocomplete == "column":
         return CompleteStyle.COLUMN
     elif config.autocomplete == "multi_column":
         return CompleteStyle.MULTI_COLUMN
-    elif config.autocomplete == "auto":
+    elif config.autocomplete in (None, "auto"):
         if os.environ.get("SHELL") and os.environ["SHELL"].endswith("fish"):
             return CompleteStyle.COLUMN
         elif os.environ.get("FISH_SHELL"):
