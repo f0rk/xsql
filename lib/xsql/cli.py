@@ -1,7 +1,15 @@
 import logging
 import re
+import signal
 import sys
 import time
+
+try:
+    import psycopg2.extensions
+    import psycopg2.extras
+    psycopg2.extensions.set_wait_callback(psycopg2.extras.wait_select)
+except ImportError:
+    pass
 
 import sqlalchemy
 import sqlglot
@@ -20,7 +28,7 @@ from .db import (
     get_server_version,
     resolve_url,
 )
-from .exc import QuitException, PGError
+from .exc import PGError, QuitException, is_cancel_exception
 from .history import history
 from .lexer import lexer
 from .prompt import render_prompt
@@ -116,6 +124,12 @@ def run(args):
 
         sys.stdout.flush()
         sys.exit(2)
+
+    def sigint_handler(*_):
+        if hasattr(conn.connection.dbapi_connection, "cancel"):
+            conn.connection.dbapi_connection.cancel()
+
+    signal.signal(signal.SIGINT, sigint_handler)
 
     if args.quiet:
         config.quiet = args.quiet
@@ -252,8 +266,10 @@ def run(args):
                 try:
                     run_command(conn, text)
                 except (sqlalchemy.exc.SQLAlchemyError, PGError) as exc:
+
                     total_time = time.monotonic_ns() - start_time
                     is_postgres = False
+                    pgexc = None
                     if hasattr(exc, "orig") and hasattr(exc.orig, "pgerror"):
                         is_postgres = True
                         pgexc = exc.orig
@@ -261,28 +277,33 @@ def run(args):
                         is_postgres = True
                         pgexc = exc
 
-                    if not is_postgres:
-                        sys.stdout.write(exc.orig.args[0])
-                        if not exc.orig.args[0].endswith("\n"):
-                            sys.stdout.write("\n")
-                    else:
-                        sys.stdout.write(
-                            "ERROR:  {}: {}"
-                            .format(
-                                pgexc.pgcode,
-                                pgexc.args[0],
+                    was_cancelled = False
+                    if is_cancel_exception(pgexc):
+                        was_cancelled = True
+
+                    if not was_cancelled:
+                        if not is_postgres:
+                            sys.stdout.write(exc.orig.args[0])
+                            if not exc.orig.args[0].endswith("\n"):
+                                sys.stdout.write("\n")
+                        else:
+                            sys.stdout.write(
+                                "ERROR:  {}: {}"
+                                .format(
+                                    pgexc.pgcode,
+                                    pgexc.args[0],
+                                )
                             )
-                        )
 
-                        for notice in conn.connection.notices:
-                            sys.stdout.write(notice)
+                            for notice in conn.connection.notices:
+                                sys.stdout.write(notice)
 
-                        conn.connection.notices.clear()
+                            conn.connection.notices.clear()
 
-                    if config.timing:
-                        write_time(total_time)
+                        if config.timing:
+                            write_time(total_time)
 
-                    sys.stdout.flush()
+                        sys.stdout.flush()
 
         except EOFError:
             if not config.quiet:
