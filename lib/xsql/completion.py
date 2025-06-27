@@ -11,6 +11,10 @@ from .config import config
 completion_cache = {}
 
 
+def clear_completions():
+    completion_cache.clear()
+
+
 def maybe_refresh_completions(conn):
     if not completion_cache:
         refresh_completions(conn)
