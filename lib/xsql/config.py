@@ -331,6 +331,13 @@ def set_autocomplete(value):
         sys.stdout.flush()
 
 
+def set_autocomplete_refresh(conn, value):
+    from .completion import maybe_refresh_completions
+
+    set_autocomplete(value)
+    maybe_refresh_completions(conn)
+
+
 def process_config_line(conn, filename, line_number, line):
     from .run import run_metacommand
 

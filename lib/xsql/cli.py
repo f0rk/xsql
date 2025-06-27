@@ -231,18 +231,14 @@ def run(args):
         "tempfile_suffix": ".sql",
         "key_bindings": bindings,
         "lexer": lexer,
+        "completer": completer,
+        "complete_style": get_complete_style(),
     }
 
     if config.history_size:
         prompt_args["history"] = history
 
     if config.autocomplete:
-        prompt_args["completer"] = completer
-
-        complete_style = get_complete_style()
-        if complete_style:
-            prompt_args["complete_style"] = complete_style
-
         refresh_completions(conn)
 
     session = PromptSession(**prompt_args)

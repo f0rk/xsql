@@ -16,7 +16,7 @@ from .completion import refresh_completions
 from .config import (
     config,
     process_command_with_variable,
-    set_autocomplete,
+    set_autocomplete_refresh,
     set_color,
     set_extended_display,
     set_field_separator,
@@ -45,6 +45,8 @@ def get_metacommand(command):
 
     if not command:
         return False
+
+    command = command.strip()
 
     if command == "help":
         command = "\\??"
@@ -489,7 +491,7 @@ def run_metacommand(conn, metacommand, rest):
             "a": set_format,
             "syntax": functools.partial(set_syntax, conn),
             "color": set_color,
-            "autocomplete": set_autocomplete,
+            "autocomplete": functools.partial(set_autocomplete_refresh, conn),
         }[metacommand]
 
         if not rest:
