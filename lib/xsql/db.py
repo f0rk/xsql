@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine.url import make_url
 
 from .alias import load_aliases
-from .aws import resolve_arn
+from .aws import rds_auth, redshift_auth, resolve_arn
 from .config import config
 
 
@@ -133,5 +133,12 @@ def resolve_url(target):
 
     if url and url.startswith("arn:"):
         url = resolve_arn(url)
+
+    if url:
+        parsed_url = make_url(url)
+        if parsed_url.password == "<iam-rds>":
+            url = rds_auth(url)
+        elif parsed_url.password == "<iam-redshift>":
+            url = redshift_auth(url)
 
     return is_url, url
