@@ -46,6 +46,8 @@ def translate(conn, query, from_=None, to=None):
             sys.stdout.flush()
             return None
 
+        importlib.reload(mod)
+
         return mod.translate(
             from_,
             to,
