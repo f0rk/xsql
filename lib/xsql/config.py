@@ -401,6 +401,8 @@ def process_config_line(conn, filename, line_number, line):
                 sys.stdout.write("SET\n")
             elif re.search("^select", line, flags=re.I):
                 sys.stdout.write("SELECT\n")
+            elif re.search("^alter session", line, flags=re.I):
+                sys.stdout.write("ALTER SESSION\n")
 
         total_time = time.monotonic_ns() - start_time
         if config.timing:
