@@ -106,7 +106,7 @@ def run_command(conn, command, title=None, show_rowcount=True, extra_content=Non
         if isinstance(command, str):
             if match := re.search(r"^\s*((create|drop)\s+(materialized\s+)?(\w+))", command, flags=re.I):
                 status = match.groups()[0]
-            elif match := re.search(r"^\s*(insert|update|delete|truncate|analyze|vacuum|copy)\b", command, flags=re.I):
+            elif match := re.search(r"^\s*(insert|update|delete|truncate|analyze|vacuum|copy|begin|commit)\b", command, flags=re.I):
                 status = match.groups()[0]
 
             command = text(command)
@@ -148,7 +148,7 @@ def run_command(conn, command, title=None, show_rowcount=True, extra_content=Non
             write_time(total_time)
 
             if config.autocomplete:
-                if re.search("^(create|drop|alter)", status.lower()):
+                if status and re.search("^(create|drop|alter)", status.lower()):
                     refresh_completions(conn)
             else:
                 clear_completions()
