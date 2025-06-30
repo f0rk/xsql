@@ -11,6 +11,13 @@ except ImportError:
         pass
 
 
+try:
+    from snowflake.connector.errors import ProgrammingError as SnowflakeProgrammingError
+except ImportError:
+    class SnowflakeProgrammingError(Exception):
+        pass
+
+
 class QuitException(Exception):
     pass
 

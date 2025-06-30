@@ -28,7 +28,12 @@ from .db import (
     get_server_version,
     resolve_url,
 )
-from .exc import PGError, QuitException, is_cancel_exception
+from .exc import (
+    PGError,
+    QuitException,
+    SnowflakeProgrammingError,
+    is_cancel_exception,
+)
 from .history import history
 from .lexer import lexer
 from .prompt import render_prompt
@@ -84,6 +89,13 @@ def try_close(conn):
 
 
 def run(args):
+    try:
+        _run(args)
+    except SnowflakeProgrammingError:
+        pass
+
+
+def _run(args):
 
     if args.version:
         sys.stdout.write("xsql {}\n".format(__version__))
