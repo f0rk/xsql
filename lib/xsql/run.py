@@ -156,7 +156,7 @@ def run_command(conn, command, title=None, show_rowcount=True, extra_content=Non
 
 def run_file(conn, file):
 
-    with open(file, "rt") as fp:
+    with open(os.path.expanduser(file), "rt") as fp:
         query = fp.read()
 
     query = translate(conn, query)
