@@ -1,7 +1,15 @@
 import os
+import re
 import sys
 
-from prompt_toolkit.completion import DynamicCompleter, WordCompleter
+import sqlglot
+import sqlglot.expressions
+from prompt_toolkit.application.current import get_app
+from prompt_toolkit.completion import (
+    Completer,
+    Completion,
+    DynamicCompleter,
+)
 from prompt_toolkit.shortcuts import CompleteStyle
 from sqlalchemy import text
 
@@ -1008,8 +1016,379 @@ def generator():
                     yield column_name
 
 
+def is_file_completion(text):
+    match = re.search(r"^\\(i|o|cd)(\b|\s)", text)
+    return match
+
+
+def is_exec_completion(text):
+    match = re.search(r"^\\([!])(\b|\s)", text)
+    return match
+
+
+class PathCompleter(Completer):
+
+    get_paths = None
+    file_filter = None
+
+    def get_completions(self, document, complete_event):
+
+        text = document.text_before_cursor.strip()
+
+        match = is_file_completion(text)
+        text = text[match.span()[1]:].strip()
+
+        return self.get_completions_for_text(text)
+
+    def get_completions_for_text(self, text):
+        try:
+
+            dirname = os.path.dirname(text)
+            if dirname:
+                directories = [dirname]
+            elif self.get_paths:
+                directories = self.get_paths()
+            else:
+                directories = [os.getcwd()]
+
+            prefix = os.path.basename(text)
+
+            filenames = []
+
+            for directory in directories:
+
+                try:
+                    to_search = os.listdir(os.path.expanduser(directory))
+                except OSError:
+                    continue
+
+                for filename in to_search:
+                    if filename.startswith(prefix):
+                        filenames.append((directory, filename))
+
+            filenames.sort(key=lambda e: e[1])
+
+            for directory, filename in filenames:
+
+                completion = filename[len(prefix):]
+                file_path = os.path.join(directory, filename)
+
+                if os.path.isdir(os.path.expanduser(file_path)):
+                    file_path += "/"
+
+                if self.file_filter:
+                    if not self.file_filter(file_path):
+                        continue
+
+                yield Completion(
+                    text=completion,
+                    start_position=0,
+                    display=filename,
+                )
+        except OSError:
+            pass
+
+
+class ExecutableCompleter(PathCompleter):
+
+    def get_paths(self):
+        return os.environ.get("PATH", "").split(os.pathsep)
+
+    def file_filter(self, path):
+        return os.access(os.path.expanduser(path), os.X_OK)
+
+    def get_completions(self, document, complete_event):
+
+        text = document.text_before_cursor.strip()
+
+        match = is_exec_completion(text)
+        text = text[match.span()[1]:].strip()
+
+        return self.get_completions_for_text(text)
+
+
 def get_completer():
-    return WordCompleter(generator, ignore_case=True)
+
+    app = get_app()
+
+    if is_file_completion(app.current_buffer.text.strip()):
+        return PathCompleter()
+    elif is_exec_completion(app.current_buffer.text.strip()):
+        return ExecutableCompleter()
+    else:
+        return SQLCompleter()
+
+
+context_free_keywords = [
+    "ABORT",
+    "COMMENT",
+    "DO",
+    "INSERT",
+    "REFRESH MATERIALIZED VIEW",
+    "SELECT",
+    "VACUUM",
+    "ALTER",
+    "COMMIT",
+    "DROP",
+    "LISTEN",
+    "REINDEX",
+    "SET",
+    "VALUES",
+    "ANALYZE",
+    "COPY",
+    "END",
+    "LOAD",
+    "RELEASE",
+    "SHOW",
+    "WITH",
+    "BEGIN",
+    "CREATE",
+    "EXECUTE",
+    "LOCK",
+    "RESET",
+    "START",
+    "CALL",
+    "DEALLOCATE",
+    "EXPLAIN",
+    "MOVE",
+    "REVOKE",
+    "TABLE",
+    "CHECKPOINT",
+    "DECLARE",
+    "FETCH",
+    "NOTIFY",
+    "ROLLBACK",
+    "TRUNCATE",
+    "CLOSE",
+    "DELETE FROM",
+    "GRANT",
+    "PREPARE",
+    "SAVEPOINT",
+    "UNLISTEN",
+    "CLUSTER",
+    "DISCARD",
+    "IMPORT",
+    "REASSIGN",
+    "SECURITY LABEL",
+    "UPDATE",
+]
+
+
+def basic_completion(text):
+    return Completion(
+        text=text,
+        start_position=0,
+        display=text,
+    )
+
+
+class SQLCompleter(Completer):
+
+    def get_completions(self, document, complete_event):
+
+        text = document.text_before_cursor.strip()
+
+        if not text:
+            for keyword in context_free_keywords:
+
+                keyword = keyword + " "
+
+                yield Completion(
+                    text=keyword[len(text):],
+                    start_position=0,
+                    display=keyword,
+                )
+        elif re.search(r"^\w+$", text):
+            for keyword in context_free_keywords:
+
+                keyword = keyword + " "
+
+                if not keyword.lower().startswith(text.lower()):
+                    continue
+
+                if text[-1:].islower():
+                    keyword = keyword.lower()
+
+                yield Completion(
+                    text=keyword[len(text):],
+                    start_position=0,
+                    display=keyword,
+                )
+        elif select_match := re.search(r"(select)\s+[*]\s*$", text, flags=re.I):
+            keyword = "FROM "
+            if "t" in select_match.groups()[0]:
+                keyword = "from "
+
+            if text.endswith("*"):
+                keyword = " " + keyword
+
+            yield basic_completion(keyword)
+        else:
+            statements = sqlglot.parse(
+                document.text_before_cursor.strip(),
+                error_level=sqlglot.ErrorLevel.IGNORE,
+            )
+
+            if not statements:
+                return []
+
+            statement = statements[-1]
+
+            expressions = list(statement.walk(bfs=False))
+            last_expression = expressions[-1]
+
+            yielded = set()
+
+            select = None
+
+            parent = last_expression
+
+            while parent:
+                if select is None and isinstance(parent, sqlglot.expressions.Select):
+                    select = parent
+
+                parent = parent.parent
+
+            available_tables = None
+            if select is not None:
+                available_tables = {}
+                for table in select.find_all(sqlglot.expressions.Table):
+                    schema = None
+                    if table.db:
+                        schema = table.db.this
+
+                    available_tables.setdefault(schema, {})
+
+                    available_tables[schema][table.this.this] = True
+
+            if isinstance(last_expression, sqlglot.expressions.Table):
+                for schema_name in completion_cache.keys():
+                    if schema_name is not None:
+                        if schema_name not in yielded:
+                            yielded.add(schema_name)
+                            yield basic_completion(schema_name)
+
+                    for table_name in completion_cache[schema_name].get("tables", {}).keys():
+                        if table_name not in yielded:
+                            yielded.add(table_name)
+                            yield basic_completion(table_name)
+
+            elif isinstance(last_expression, sqlglot.expressions.Where):
+
+                for schema_name in completion_cache.keys():
+
+                    if schema_name not in available_tables and None not in available_tables:
+                        continue
+
+                    if schema_name not in available_tables:
+                        yielded.add(schema_name)
+                        yield basic_completion(schema_name)
+
+                    for table_name in completion_cache[schema_name].get("tables", {}).keys():
+
+                        is_matching_table = False
+                        if available_tables.get(schema_name) and table_name in available_tables[schema_name]:
+                            is_matching_table = True
+                        elif available_tables.get(None) and table_name in available_tables[None]:
+                            is_matching_table = True
+
+                        if not is_matching_table:
+                            continue
+
+                        yielded.add(table_name)
+                        yield basic_completion(table_name)
+
+                        for column_name in completion_cache[schema_name]["tables"][table_name]:
+                            if column_name not in yielded:
+                                yielded.add(column_name)
+                                yield basic_completion(column_name)
+
+                return []
+
+            elif isinstance(last_expression, sqlglot.expressions.Identifier):
+
+                is_column = False
+
+                checked_expressions = [last_expression]
+                try:
+                    checked_expressions.append(expressions[-2])
+                except IndexError:
+                    pass
+
+                for checked_expression in checked_expressions:
+                    if isinstance(checked_expression, sqlglot.expressions.Column):
+                        is_column = True
+                    elif isinstance(checked_expression.parent, sqlglot.expressions.Column):
+                        is_column = True
+
+                if is_column:
+                    for schema_name in completion_cache.keys():
+
+                        if schema_name not in available_tables and None not in available_tables:
+                            continue
+
+                        for table_name in completion_cache[schema_name].get("tables", {}).keys():
+
+                            is_matching_table = False
+                            if available_tables.get(schema_name) and table_name in available_tables[schema_name]:
+                                is_matching_table = True
+                            elif available_tables.get(None) and table_name in available_tables[None]:
+                                is_matching_table = True
+
+                            if not is_matching_table:
+                                continue
+
+                            for column_name in completion_cache[schema_name]["tables"][table_name]:
+
+                                if not column_name.startswith(last_expression.this):
+                                    continue
+
+                                if column_name not in yielded:
+                                    yielded.add(column_name)
+                                    yield Completion(
+                                        text=column_name[len(last_expression.this):],
+                                        start_position=0,
+                                        display=column_name,
+                                    )
+
+                    return []
+
+                for schema_name in completion_cache.keys():
+                    if schema_name is not None:
+
+                        if schema_name not in yielded:
+                            if schema_name.startswith(last_expression.this):
+                                yielded.add(schema_name)
+                                yield Completion(
+                                    text=schema_name[len(last_expression.this):],
+                                    start_position=0,
+                                    display=schema_name,
+                                )
+
+                    for table_name in completion_cache[schema_name].get("tables", {}).keys():
+
+                        if table_name not in yielded:
+                            if table_name.startswith(last_expression.this):
+                                yielded.add(table_name)
+                                yield Completion(
+                                    text=table_name[len(last_expression.this):],
+                                    start_position=0,
+                                    display=table_name,
+                                )
+
+                            for column_name in completion_cache[schema_name]["tables"][table_name]:
+                                if not column_name.startswith(last_expression.this):
+                                    continue
+
+                                if column_name not in yielded:
+                                    yielded.add(column_name)
+                                    yield Completion(
+                                        text=column_name[len(last_expression.this):],
+                                        start_position=0,
+                                        display=column_name,
+                                    )
+
+            return []
 
 
 completer = DynamicCompleter(get_completer)
