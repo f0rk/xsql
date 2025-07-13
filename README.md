@@ -37,6 +37,7 @@ dialects.
 \timing
 \syntax on
 \color on
+\autocomplete on
 
 [postgresql]
 set time zone 'America/New_York';
@@ -69,6 +70,8 @@ Time: 0.412 ms
 Time: 0.130 ms
 (postgres@[local]:5432 06:37:25) [db]>
 ```
+
+Note that unlike in `psql`, autocomplete is off by default.
 
 xsql supports named connections, via the `~/.xsql/aliases` file.
 Enter each line as `<name>: <url>`, for example:
