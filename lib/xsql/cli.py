@@ -264,11 +264,11 @@ def _run(args):
 
     while True:
         try:
-            def prompt_continuation(width, line_number, is_soft_wrap):
-                return render_prompt(conn, config.prompt2)
+            def prompt_continuation(width, line_number, wrap_count):
+                return render_prompt(conn, config.prompt2, wrap_count)
 
             text = session.prompt(
-                render_prompt(conn, config.prompt1),
+                render_prompt(conn, config.prompt1, 0),
                 multiline=True,
                 prompt_continuation=prompt_continuation,
             )
