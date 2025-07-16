@@ -2,7 +2,10 @@ import re
 import subprocess
 
 
-def render_prompt(conn, prompt_string):
+def render_prompt(conn, prompt_string, wrap_count):
+
+    if wrap_count > 0:
+        return ""
 
     url = conn.engine.url
 
