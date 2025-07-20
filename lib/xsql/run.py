@@ -177,7 +177,7 @@ def get_maybe_status(command):
             status = match.groups()[0]
         elif match := re.search(r"^\s*((create|drop)\s+(temporary\s+)?(\w+))", command, flags=re.I):
             status = match.groups()[0]
-        elif match := re.search(r"^\s*(insert|update|delete|truncate|analyze|vacuum|copy|begin|commit)\b", command, flags=re.I):
+        elif match := re.search(r"^\s*(insert|update|delete|truncate|analyze|vacuum|copy|begin|commit|rollback|savepoint|release|set)\b", command, flags=re.I):
             status = match.groups()[0]
 
     return status
