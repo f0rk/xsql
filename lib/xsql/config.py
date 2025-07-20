@@ -42,7 +42,7 @@ class Configuration:
 
         self.output = output
 
-        self.isolation_level = isolation_level
+        self.isolation_level = isolation_level.upper()
         self.null = null
 
         if pager is None:
