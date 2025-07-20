@@ -295,9 +295,14 @@ def _run(args):
 
                     if not was_cancelled:
                         if not is_postgres:
-                            sys.stdout.write(exc.orig.args[0])
-                            if not exc.orig.args[0].endswith("\n"):
-                                sys.stdout.write("\n")
+                            if hasattr(exc, "orig"):
+                                sys.stdout.write(exc.orig.args[0])
+                                if not exc.orig.args[0].endswith("\n"):
+                                    sys.stdout.write("\n")
+                            else:
+                                sys.stdout.write(exc.args[0])
+                                if not exc.args[0].endswith("\n"):
+                                    sys.stdout.write("\n")
                         else:
                             sys.stdout.write(
                                 "ERROR:  {}: {}"
