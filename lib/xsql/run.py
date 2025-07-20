@@ -121,6 +121,7 @@ def run_command(conn, command, title=None, show_rowcount=True, extra_content=Non
             conn,
             results,
             total_time,
+            status=status,
             title=title,
             show_rowcount=show_rowcount,
             extra_content=extra_content,
@@ -145,7 +146,7 @@ def run_file(conn, file):
     output_results(conn, results, total_time)
 
 
-def output_results(conn, results, total_time, title=None, show_rowcount=True, extra_content=None):
+def output_results(conn, results, total_time, status=None, title=None, show_rowcount=True, extra_content=None):
 
     if results.returns_rows:
         try:
