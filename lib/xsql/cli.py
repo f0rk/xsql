@@ -312,11 +312,6 @@ def _run(args):
                                 )
                             )
 
-                            for notice in conn.connection.notices:
-                                sys.stdout.write(notice)
-
-                            conn.connection.notices.clear()
-
                         if config.timing:
                             write_time(total_time)
 
