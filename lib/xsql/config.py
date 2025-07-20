@@ -394,8 +394,6 @@ def process_config_line(conn, filename, line_number, line):
         start_time = time.monotonic_ns()
         conn.execute(text(line))
 
-        conn.execute(text("commit;"))
-
         if not config.quiet:
             if re.search("^set", line, flags=re.I):
                 sys.stdout.write("SET\n")
