@@ -37,6 +37,7 @@ from .history import history
 from .output import get_pager, should_use_pager, write, write_csv
 from .parsers import parse_copy
 from .postgres import get_command_status
+from .split import split_command
 from .time import write_time
 from .translate import translate
 
@@ -96,19 +97,31 @@ def run_command(conn, command, title=None, show_rowcount=True, extra_content=Non
         )
     else:
 
+        if isinstance(command, str):
+            subcommands = split_command(command, conn.dialect.name)
+        else:
+            subcommands = [command]
+
+        if len(subcommands) > 1:
+            for subcommand in subcommands:
+                run_command(
+                    conn,
+                    subcommand,
+                    title=title,
+                    show_rowcount=show_rowcount,
+                    extra_content=extra_content,
+                )
+
+            return
+        else:
+            command = subcommands[0]
+
         command = translate(conn, command)
         if command is None:
             return
 
-        # XXX: really need to get cursor.statusmessage or pgresult_ptr to work
-        status = None
-
         if isinstance(command, str):
-            if match := re.search(r"^\s*((create|drop)\s+(materialized\s+)?(\w+))", command, flags=re.I):
-                status = match.groups()[0]
-            elif match := re.search(r"^\s*(insert|update|delete|truncate|analyze|vacuum|copy|begin|commit)\b", command, flags=re.I):
-                status = match.groups()[0]
-
+            status = get_maybe_status(command)
             command = text(command)
 
         start_time = time.monotonic_ns()
@@ -131,19 +144,43 @@ def run_command(conn, command, title=None, show_rowcount=True, extra_content=Non
 def run_file(conn, file):
 
     with open(os.path.expanduser(file), "rt") as fp:
-        query = fp.read()
+        data = fp.read()
 
-    query = translate(conn, query)
-    if query is None:
-        return
+    queries = split_command(data, conn.dialect.name)
 
-    start_time = time.monotonic_ns()
+    for query in queries:
 
-    results = conn.execute(text(query))
+        status = get_maybe_status(query)
 
-    total_time = time.monotonic_ns() - start_time
+        query = translate(conn, query)
+        if query is None:
+            return
 
-    output_results(conn, results, total_time)
+        start_time = time.monotonic_ns()
+
+        results = conn.execute(text(query))
+
+        total_time = time.monotonic_ns() - start_time
+
+        output_results(conn, results, total_time, status=status)
+
+
+def get_maybe_status(command):
+
+    # XXX: really need to get cursor.statusmessage or pgresult_ptr to work
+    status = None
+
+    if isinstance(command, str):
+        if match := re.search(r"^\s*((create|drop)\s+or\s+replace\s+(\w+))", command, flags=re.I):
+            status = match.groups()[1] + " " + match.groups()[2]
+        elif match := re.search(r"^\s*((create|drop)\s+(materialized\s+)?(\w+))", command, flags=re.I):
+            status = match.groups()[0]
+        elif match := re.search(r"^\s*((create|drop)\s+(temporary\s+)?(\w+))", command, flags=re.I):
+            status = match.groups()[0]
+        elif match := re.search(r"^\s*(insert|update|delete|truncate|analyze|vacuum|copy|begin|commit)\b", command, flags=re.I):
+            status = match.groups()[0]
+
+    return status
 
 
 def output_results(conn, results, total_time, status=None, title=None, show_rowcount=True, extra_content=None):
@@ -179,7 +216,7 @@ def output_results(conn, results, total_time, status=None, title=None, show_rowc
         write_time(total_time)
 
         if config.autocomplete:
-            if status and re.search("^(create|drop|alter)", status.lower()):
+            if status and re.search("^\s*(create|drop|alter)", status.lower()):
                 refresh_completions(conn)
         else:
             clear_completions()
