@@ -117,41 +117,15 @@ def run_command(conn, command, title=None, show_rowcount=True, extra_content=Non
 
         total_time = time.monotonic_ns() - start_time
 
-        if results.returns_rows:
-            try:
-                write(
-                    results,
-                    title=title,
-                    show_rowcount=show_rowcount,
-                    extra_content=extra_content,
-                    total_time=total_time,
-                )
-            except BrokenPipeError:
-                pass
-
-        else:
-
-            if results.cursor is not None:
-                status = results.cursor.statusmessage
-
-                if not status:
-                    if conn.dialect.driver == "psycopg2":
-                        status = get_command_status(results.cursor)
-
-            if status:
-                config.output.write(status.upper())
-                if results.rowcount > -1:
-                    config.output.write(" ")
-                    config.output.write(str(results.rowcount))
-                config.output.write("\n")
-
-            write_time(total_time)
-
-            if config.autocomplete:
-                if status and re.search("^(create|drop|alter)", status.lower()):
-                    refresh_completions(conn)
-            else:
-                clear_completions()
+        output_results(
+            conn,
+            results,
+            total_time,
+            status=status,
+            title=title,
+            show_rowcount=show_rowcount,
+            extra_content=extra_content,
+        )
 
 
 def run_file(conn, file):
@@ -163,11 +137,52 @@ def run_file(conn, file):
     if query is None:
         return
 
+    start_time = time.monotonic_ns()
+
     results = conn.execute(text(query))
-    try:
-        write(results)
-    except BrokenPipeError:
-        pass
+
+    total_time = time.monotonic_ns() - start_time
+
+    output_results(conn, results, total_time)
+
+
+def output_results(conn, results, total_time, status=None, title=None, show_rowcount=True, extra_content=None):
+
+    if results.returns_rows:
+        try:
+            write(
+                results,
+                title=title,
+                show_rowcount=show_rowcount,
+                extra_content=extra_content,
+                total_time=total_time,
+            )
+        except BrokenPipeError:
+            pass
+
+    else:
+
+        if results.cursor is not None:
+            status = results.cursor.statusmessage
+
+            if not status:
+                if conn.dialect.driver == "psycopg2":
+                    status = get_command_status(results.cursor)
+
+        if status:
+            config.output.write(status.upper())
+            if results.rowcount > -1:
+                config.output.write(" ")
+                config.output.write(str(results.rowcount))
+            config.output.write("\n")
+
+        write_time(total_time)
+
+        if config.autocomplete:
+            if status and re.search("^(create|drop|alter)", status.lower()):
+                refresh_completions(conn)
+        else:
+            clear_completions()
 
 
 def build_native_copy(query, options):
