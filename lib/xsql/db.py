@@ -1,11 +1,12 @@
 import sys
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine.url import make_url
 
 from .alias import load_aliases
 from .aws import rds_auth, redshift_auth, resolve_arn
 from .config import config
+from .notice import Notice
 
 
 class Reconnect(Exception):
@@ -28,6 +29,11 @@ def make_engine(url):
 
 def connect(url):
     engine = make_engine(url)
+
+    @event.listens_for(engine, "connect")
+    def connect(dbapi_connection, _):
+        dbapi_connection.notices = Notice()
+
     conn = engine.connect()
 
     if conn.dialect.name == "snowflake":
