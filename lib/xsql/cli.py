@@ -312,6 +312,9 @@ def _run(args):
                                 )
                             )
 
+                            if not pgexc.args[0].endswith("\n"):
+                                sys.stdout.write("\n")
+
                         if config.timing:
                             write_time(total_time)
 

@@ -1,4 +1,22 @@
+import io
+import re
+
 from .quote import get_quote_positions, is_in_quote
+
+
+def is_empty(query):
+
+    query = query.strip()
+
+    lines = 0
+
+    for line in io.StringIO(query):
+        if re.search(r"^\s*--", line):
+            continue
+
+        lines += 1
+
+    return lines == 0
 
 
 def split_command(data, dialect):
@@ -21,7 +39,11 @@ def split_command(data, dialect):
 
         if c == ";":
             if not is_in_quote(quote_positions, idx):
-                parts.append(buffer)
-                buffer = ""
+                if not is_empty(buffer):
+                    parts.append(buffer)
+                    buffer = ""
+
+    if not is_empty(buffer):
+        parts.append(buffer)
 
     return parts
