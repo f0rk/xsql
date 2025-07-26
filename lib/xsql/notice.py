@@ -1,6 +1,5 @@
 import sys
 
-
 notices = []
 
 class Notice:
