@@ -15,7 +15,6 @@ from sqlalchemy import text
 
 from .config import config
 
-
 completion_cache = {}
 
 
@@ -1255,7 +1254,10 @@ class SQLCompleter(Completer):
                 for table in select.find_all(sqlglot.expressions.Table):
                     schema = None
                     if table.db:
-                        schema = table.db.this
+                        if isinstance(table.db, str):
+                            schema = table.db
+                        else:
+                            schema = table.db.this
 
                     available_tables.setdefault(schema, {})
 
