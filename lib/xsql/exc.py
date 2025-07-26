@@ -18,6 +18,20 @@ except ImportError:
         pass
 
 
+try:
+    from snowflake.connector.errors import Error as SnowflakeError
+except ImportError:
+    class SnowflakeError(Exception):
+        pass
+
+
+try:
+    from snowflake.connector.network import ReauthenticationRequest as SnowflakeReauthenticationRequest
+except ImportError:
+    class SnowflakeReauthenticationRequest(Exception):
+        pass
+
+
 class QuitException(Exception):
     pass
 

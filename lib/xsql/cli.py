@@ -21,18 +21,20 @@ from prompt_toolkit.output.color_depth import ColorDepth
 from .completion import completer, get_complete_style, refresh_completions
 from .config import config
 from .db import (
-    Reconnect,
     connect,
     display_ssl_info,
     get_server_name,
     get_server_version,
+    Reconnect,
     resolve_url,
 )
 from .exc import (
+    is_cancel_exception,
     PGError,
     QuitException,
+    SnowflakeError,
     SnowflakeProgrammingError,
-    is_cancel_exception,
+    SnowflakeReauthenticationRequest,
 )
 from .history import history
 from .lexer import lexer
@@ -45,7 +47,6 @@ from .run import (
 )
 from .time import write_time
 from .version import __version__
-
 
 sqlglot_logger = logging.getLogger("sqlglot")
 sqlglot_logger.setLevel(logging.ERROR)
@@ -91,7 +92,7 @@ def try_close(conn):
 def run(args):
     try:
         _run(args)
-    except SnowflakeProgrammingError:
+    except (SnowflakeError, SnowflakeProgrammingError, SnowflakeReauthenticationRequest) as _:
         pass
 
 
