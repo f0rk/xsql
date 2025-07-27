@@ -2,7 +2,6 @@ import re
 
 from lark import Lark, Transformer
 
-
 options_parser = Lark(r"""
 	_STRING_INNER: /.*?/
 	_STRING_ESC_INNER: _STRING_INNER /(?<!\\)(\\\\)*?/
