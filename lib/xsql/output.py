@@ -164,7 +164,7 @@ def write_aligned(output, records, result, title=None, write_title=True, write_h
 
             if isinstance(value, (int, float, Decimal)):
                 pass
-            elif not re.search(r'^-?([1-9]+[0-9]*|0)(\.[0-9]+)?$', str_value):
+            elif not re.search(r"^-?([1-9]+[0-9]*|0)(\.[0-9]+)?$", str_value):
                 number_looking_fields[idx] = False
 
     header_fmt_parts = []

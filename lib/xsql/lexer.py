@@ -1,7 +1,6 @@
 from prompt_toolkit.lexers import PygmentsLexer, SimpleLexer
 from pygments.lexers import sql
 
-
 simple_lexer = SimpleLexer()
 
 
