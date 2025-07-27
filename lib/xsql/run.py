@@ -1,12 +1,13 @@
 import copy
 import functools
 import io
+import itertools
 import os
 import re
 import subprocess
 import sys
-import time
 import tempfile
+import time
 
 import lark
 from prompt_toolkit.buffer import Buffer
@@ -30,7 +31,7 @@ from .config import (
     set_translate,
     set_tuples_only,
 )
-from .db import Reconnect, display_ssl_info
+from .db import display_ssl_info, Reconnect
 from .exc import QuitException
 from .formatters import CopyWriter
 from .history import history
@@ -80,7 +81,7 @@ def glob_to_like(v):
     return v.replace("*", "%")
 
 
-def run_command(conn, command, title=None, show_rowcount=True, extra_content=None):
+def run_command(conn, command, title=None, show_rowcount=True, extra_content=None, split=True):
 
     if isinstance(command, str) and is_maybe_metacommand(command):
         match = get_metacommand(command)
@@ -98,23 +99,39 @@ def run_command(conn, command, title=None, show_rowcount=True, extra_content=Non
     else:
 
         if isinstance(command, str):
-            subcommands = split_command(command, conn.dialect.name)
+            if split:
+                subcommands = split_command(command, conn.dialect.name)
+            else:
+                subcommands = [command]
         else:
             subcommands = [command]
 
-        if len(subcommands) > 1:
-            for subcommand in subcommands:
+        first_two_commands = []
+        try:
+            first_two_commands.append(next(subcommands))
+            first_two_commands.append(next(subcommands))
+        except TypeError:
+            pass
+        except StopIteration:
+            pass
+
+        if len(first_two_commands) > 1:
+            for subcommand in itertools.chain(first_two_commands, subcommands):
                 run_command(
                     conn,
                     subcommand,
                     title=title,
                     show_rowcount=show_rowcount,
                     extra_content=extra_content,
+                    split=False,
                 )
 
             return
         else:
-            command = subcommands[0]
+            if first_two_commands:
+                command = first_two_commands[0]
+            else:
+                command = subcommands[0]
 
         command = translate(conn, command)
         if command is None:
@@ -216,7 +233,7 @@ def output_results(conn, results, total_time, status=None, title=None, show_rowc
         write_time(total_time)
 
         if config.autocomplete:
-            if status and re.search("^\s*(create|drop|alter)", status.lower()):
+            if status and re.search(r"^\s*(create|drop|alter)", status.lower()):
                 refresh_completions(conn)
         else:
             clear_completions()
@@ -1219,7 +1236,7 @@ def metacommand_describe(conn, target):
                                 extra_content.write(":\n")
                                 write_header[section_key] = False
 
-                            extra_content.write('    ')
+                            extra_content.write("    ")
 
                             _, trigger_definition = trigger_result.triggerdef.split(" TRIGGER ", maxsplit=1)
                             extra_content.write(trigger_definition)
